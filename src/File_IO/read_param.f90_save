@@ -1,0 +1,508 @@
+!===============================================================================
+subroutine read_param(paramfile)
+!===============================================================================
+  !> Reading simulation parameters in param.ini (new version)
+!===============================================================================
+  use mod_mpi
+  use mod_constant
+  use mod_coeff_deriv
+  use mod_flow
+  use mod_rans
+  use mod_time
+  use mod_io
+  use mod_eos
+  use mod_tranprop
+  use mod_init_flow
+  use mod_routines
+  use mod_forcing_bulk  ! <~ for forcing parameters
+  use mod_eigenmode     ! <~ for entering eigenmodes
+  use mod_RFM           ! <~ for using Random Fourier Modes
+  use mod_init_irs      ! <~ for irs_version !!!!!!!!!! TEMPORARY !!!!!!!!!!!!!!!!
+  use mod_bc_periodicity! <~ to fill Lxp,Lyp,Lzp or theta_period
+  implicit none
+  ! ---------------------------------------------------------------------------
+  character(len=*), intent(in) :: paramfile
+  logical :: iexist
+  ! ---------------------------------------------------------------------------
+
+  ! Initializations
+  ! ===============
+  is_2d           = .false.
+  is_curv         = .false.
+  is_curv3        = .false.
+  is_shock        = .false.
+  is_IOtec_read   = .false.
+  is_IOtec_write  = .false.
+  is_src          = .false.
+  is_pulse        = .false.
+  is_mean0        = .false.
+  is_similarity   = .false.
+  is_forcing_bulk = .false.
+  is_residue      = .false.
+  is_init_2D3D    = .false.
+  is_RANS         = .false.
+  is_slip_in      = .false.
+  is_BC_ref       = .false.
+  is_stagnation   = .false.
+  is_rea          = .false.
+  is_curv         = .true.
+  !is_curv         = .false.
+  is_init1_RFM    = .true. ! RFM initialization cut in two part, needs to be .true. initially
+  is_LBL          = .false.
+
+  ! default values
+  is_adjoint_block = .false.
+  is_SBP = .false.
+  is_wall2 = .false.
+  is_comm_onesided = .false.
+  is_dissip_in_increments=.false.
+  is_dtlocal=.false.
+  
+  !! /!\ !! TO BE FILLED BY THE USER [advanced options] TO BE CHANGED
+  is_two_sided_comm = .false.
+
+  !! /!\ !! TO BE FILLED BY THE USER [advanced options] TO BE CHANGED
+  iLES = 0
+  
+  ! Read param.ini file
+  ! ===================
+  inquire(file=trim(paramfile), exist=iexist)
+  if (.not.iexist) then
+     call mpistop('Paramfile does not exist!', 0)
+  endif
+
+  open(30,file=trim(paramfile))
+  read(30,*)! =================================================================
+  read(30,*)! SOLVER PARAMETERS
+  read(30,*)! =================================================================
+  !read(30,*) ! Running RANS simulation? (T: yes, F: no) If yes, what model?
+  !read(30,*) is_RANS,model_RANS,ndeb_RANS
+  !is_RANS=.true.
+  is_RANS=.false.
+  model_RANS='SA'
+  ndeb_RANS=99999999
+  !ndeb_RANS=10000
+  ! Restart indicator idepart [redefined in mod_io.f90 header]
+  read(30,*) ! [1:from_scratch; 2:from_field; 3:from_interp; 4:post-processing]
+  read(30,*) idepart
+  ! Filestamp of initial restart file 
+  read(30,*) ! (if not specified or default 0000_0000, restart.bin is used)
+  read(30,*) filestamp
+  if (idepart.eq.1) filestamp='0000_0000'
+  ! Max number of temporal iterations or Final time
+  read(30,*) ! (the max will be considered)
+  read(30,*) nmax, timemax
+  ! Hours of simulations 
+  read(30,*) ! (maximum elapsed time - useful for limited computer classes)
+  read(30,*) cpumax
+  ! convert cpumax in seconds
+  cpumax = cpumax*3600.0_wp
+  ! Choice of Runge-Kutta scheme [4:classic low-storage RK4; 6: DRP-optimised RK6]
+  read(30,*) ! [4:classic low-storage RK4; 6: DRP-optimised RK6]
+  read(30,*) nrk
+  ! Implicit Residual Smoothing [0:explicit; 2:IRS2; 4:IRS4, 6:IRS6, 8:IRS8]
+  read(30,*) !
+  read(30,*) iirs
+  ! Residual smoothing parameter
+  read(30,*) ! (used only for Implicit RK/IRS)
+  read(30,*) theta_irs1, theta_irs2, theta_irs4, theta_irs6, theta_irs8
+  ! Type of parallelisation for IRS (1: ngh, 2: scalapack band/tri, 3 : pascal)
+  read(30,*)
+  read(30,*) type_para
+  ! Direction of implicitation (T: yes, F: no)
+  read(30,*)
+  read(30,*) is_irs_i, is_irs_j, is_irs_k
+  if (iirs==0) then
+     ! default initialization if IRS is not activated
+     is_irs_i=.false.
+     is_irs_j=.false.
+     is_irs_k=.false.
+     is_irs=.false.
+  else
+     ! global indicator for IRS
+     is_irs=is_irs_i.or.is_irs_j.or.is_irs_k
+  endif
+  ! Delta t: boolean is_dtlocal (evaluated at each point), CFL number
+  read(30,*)
+  read(30,*) is_dtlocal, CFL
+  is_dtvar = .false.
+  ! Order of viscous fluxes [2:second-order on 3pts; 4:fourth-order on 5pts; 0:Euler]
+  read(30,*) ! [2:second-order on 3pts; 4:fourth-order on 5pts; 0:Euler]
+  read(30,*) iorder_visc
+
+  stencil_RANS=iorder_visc+1 ! To be modified
+
+  ! Finite Difference & Dissipation schemes
+  read(30,*) ! stencil [3;5;7;9;11 pts]; is_DRP [T: DRP; F:standard FD]
+  read(30,*) stencil, is_DRP
+  ! Selective Filtering: is_SF
+  read(30,*) ! is_SF [T:SF; F:art.visc]
+  read(30,*) is_SF
+  ! Filtering or Artificial viscosity amplitude
+  ! (between 0 and 1 for SF, recommended value 0.1 / around 1.0 for art.visc)
+  read(30,*) ! for Selective Filter: 0.<X_sf<1. [recommended value 0.1]
+  read(30,*) ! for Artificial visc.: around 1.0 [recommended value 1.]
+  read(30,*) dissip_coeff
+  !read(30,*) ! RANS: turbulent field solver parameter
+  !read(30,*) ! Finite Difference stencil : identical for convective, diffusive and dissipative fluxes [3(Rusanov);5 pts]
+  !read(30,*) stencil_RANS
+  ! Indicator is_shock (boolean) and Coefficient of low-order term 
+  read(30,*) ! recommended value: dissip_shock=2.
+  read(30,*) is_shock, dissip_shock
+  read(30,*)! =================================================================
+  read(30,*)! OUTPUT MANAGEMENT
+  read(30,*)! =================================================================
+  ! Format of inputs: is_IOtec_read 
+  read(30,*) ! [T:Tecplot; F:fortran binary]  **** Att. binary ENDIANESS ****
+  read(30,*) is_IOtec_read
+  filext_read ='.bin'
+  if (is_IOtec_read) filext_read='.plt'
+  ! Format of outputs: is_IOtec_write
+  read(30,*) ! [T:Tecplot; F:fortran binary]  **** Att. binary ENDIANESS ****
+  read(30,*) is_IOtec_write
+  filext_write='.bin'
+  if (is_IOtec_write) filext_write='.plt'
+  ! is_timestamp for planes [T:multiple files with timestamp; F:append a single file]
+  read(30,*)! [T:multiple files with timestamp; F:append a single file]
+  read(30,*) is_timestamp
+  ! Output frequencies: screen / stats / planes / fields    
+  read(30,*)
+  read(30,*) nprint,freq_stats,freq_plane,freq_plane_check,freq_field
+  dtprint = 10000.0_wp ! for what ????????????? TO BE CHANGED
+
+  ! ********** WARNING ****************
+  ! Nota temporarily freq_line = freq_plane (not included yet in param.ini)
+  freq_point=freq_plane
+  freq_line=freq_plane
+  !freq_line=freq_plane/1000
+  freq_volume=freq_plane
+ 
+  ! Compute residuals: boolean is_residue
+  read(30,*) ! (for steady computations)
+  read(30,*) is_residue
+  ! Iteration number to start statistics: ndeb
+  read(30,*) ! 
+  read(30,*) ndeb
+  read(30,*)! =================================================================
+  read(30,*)! FLUID THERMO-PHYSICAL PROPERTIES
+  read(30,*)! =================================================================
+  ! Fluid (-> fluid parameters in feos_(name_of_fluid).ini)
+  read(30,*) ! Fluidname
+  read(30,*) fluidname
+  read(30,*) ! Equation of State (EOS)
+  read(30,*) ! Perfect gas          : pfg
+  read(30,*) ! van der Waals        : vdw
+  read(30,*) ! Martin-Hou           : mah
+  read(30,*) ! Span-Wagner polar    : swp
+  read(30,*) ! Span-Wagner non-polar: swn
+  read(30,*) ! Peng-Robinson        : prs
+  read(30,*) ! NIST REFPROP library : ref
+  read(30,*) eos_type
+  ! Check
+  if (fluidname.eq.'air' .and. eos_type.ne.'pfg') then
+     call mpistop('Only PFG EoS for air!',0)
+  elseif (fluidname.eq.'pp11' .and. eos_type.eq.'pfg') then
+     call mpistop('Do not use PFG EoS with PP11!',0) ! TO BE CHANGED
+  endif
+  ! Viscosity law (only chung for dense gas)
+  read(30,*) ! [S:Sutherland; P:powerlaw; C:Chung-Lee-Starling]
+  read(30,*) visc_type
+  ! Check
+  if ( visc_type.eq.'C'.and.eos_type.eq.'pfg' .or. &
+       visc_type.eq.'S'.and.eos_type.ne.'pfg') then
+     call mpistop('Wrong combination of visc law and EoS!', 0)! TO BE CHANGED
+  endif
+  ! Thermal conductivity law
+  read(30,*) ! [C:constant Prandtl; ...]
+  read(30,*) ! **** NOT IMPLEMENTED yet **** conductivity_type
+  ! Adiabatic wall (if present) 
+  read(30,*) ! [T:adiabatic; F:isothermal], T_wall (if not adiabatic, if not specified set to T_ref)
+  read(30,*) is_adiab, T_wall
+
+  ! Turbomachinery boundary conditions
+  ! ==================================
+  ! Radial Equilibrium
+  !is_rea=.true.
+
+  read(30,*)! =================================================================
+  read(30,*)! CASES PARAMETERS
+  read(30,*)! =================================================================
+  read(30,*)! Reference quantities
+  read(30,*)! ====================
+  ! stagnation (T) or static (F) freestream conditions
+  read(30,*)
+  read(30,*) ! **** NOT IMPLEMENTED yet **** only F
+  ! Reference temperature (could be freestream, wall, ...)
+  read(30,*) ! (could be freestream, wall, ...)
+  read(30,*) T_ref
+  ! Reference density (freestream, bulk, ...) (used only for static conditions, easier than p for dense gases)
+  read(30,*) ! 
+  read(30,*) rho_ref
+  ! Reference pressure (used only for stagnation conditions)
+  read(30,*) ! 
+  read(30,*) p_ref
+
+  ! Please fill
+  is_stagnation=.true.
+
+  ! Reference Mach number (freestream, bulk, turbulent ...)
+  read(30,*)
+  read(30,*) Mach
+  ! Reference Reynolds number
+  read(30,*)
+  read(30,*) Re_ref
+  ! Reference length 
+  read(30,*) ! [optional; deduced from reference Re unless stated otherwise]
+  read(30,*) L_ref
+  ! Reference velocity 
+  read(30,*) ! [optional; deduced from reference Mach unless stated otherwise]
+  read(30,*) ! **** NOT IMPLEMENTED yet **** u_ref
+  read(30,*)! Flow initializations
+  read(30,*)! ====================
+
+
+  ! imposed directions of velocity at inlet
+  theta_ref=0.0_wp
+  phi_ref=0.0_wp
+  ! imposed exit pressure
+  p_exit=p_ref
+
+  ! initialize translation vector for planar periodicity
+  ! [used in grid_comm, add_gh]
+  Lxp=0.0_wp
+  Lyp=0.0_wp
+  Lzp=0.0_wp
+
+  ! angle for angular periodicity
+  theta_period=0.0_wp
+
+  ! annulus
+  !theta_period=90.0_wp
+
+  ! LS89 vane passage: 43 stator blades
+  !theta_period=360.0_wp/43.0_wp
+
+  ! Baumgartner: 8 stator blades
+  !theta_period=360.0_wp/8.0_wp
+
+  ! constant velocity vector (normalized by reference velocity)
+  read(30,*) ! Uc=(Uc1,Uc2,Uc3)^T
+  read(30,*) Uc1, Uc2, Uc3
+  ! laminar boundary layer: is_similarity, Re_inlet, jdel
+  read(30,*) !
+  read(30,*) is_similarity, Re_inlet, jdel
+  ! source definition: ampl(Pa), lambda/deltax, half-width b/deltax, x_src, y_src
+  read(30,*) ! 
+  read(30,*) is_src, ampl_src, omeg_src, b_src, x_src, y_src
+  ! pulse definition: ampl(Pa), half-width b/deltax, x_pulse, y_pulse, z_pulse
+  read(30,*) ! 
+  read(30,*) is_pulse, ampl_pulse, b_pulse, x_pulse, y_pulse, z_pulse
+  ! vortex definition: type_vortex, x_vortex, y_vortex, z_vortex
+  read(30,*) ! 
+  read(30,*) is_vortex, type_vortex, x_vortex, y_vortex, z_vortex
+  ! Boolean indicator is_forcing_bulk
+  read(30,*) ! enforce mass flow rate for channel flow
+  read(30,*) is_forcing_bulk
+  ! Boolean indicator is_eigenmode
+  read(30,*) ! to enter eigenmodes at inlet
+  read(30,*) ! [needs param_stab.ini to define eigenmode parameters]
+  read(30,*) is_eigenmode
+  read(30,*) ! to enter Random Fourier Modes at inlet OR initialize a field with RFM
+  read(30,*) ! [needs param_RFM.ini to define RFM parameters]
+  read(30,*) is_RFM
+  read(30,*)! =================================================================
+  read(30,*)! GEOMETRY PARAMETERS
+  read(30,*)! =================================================================
+  ! xmin xmax ymin ymax zmin zmax 
+  read(30,*) ! (normalized by reference length)
+  read(30,*) ! **** NOT IMPLEMENTED yet **** xmin xmax ymin ymax zmin zmax
+  ! Grid sizes: deltax, deltay, deltaz
+  read(30,*) ! (dimensional/normalized/wall unit based on u_tau approximation or given)
+  read(30,*) deltax, deltay, deltaz
+  ! stretching parameters: rx,ry,rz
+  read(30,*) ! (dimensional/normalized/wall unit based on u_tau approximation or given)
+  read(30,*) ! **** NOT IMPLEMENTED yet **** rx, ry, rz
+  ! Boolean indicator is_curv (is the grid curvilinear)
+  read(30,*) ! (enforce curvilinear solver)
+  read(30,*) is_curv
+  ! Boolean indicator is_curv3 (is the grid full 3D curvilinear)
+  ! **** NOT YET in param.ini ****
+  !is_curv3=.true.
+  if (is_curv3) is_curv=.false.
+  read(30,*)! =================================================================
+  read(30,*)! PREDEFINED CASES
+  read(30,*)! =================================================================
+  ! Flowtype indicator 
+  read(30,*) ! [0:not predefined; 1:TGV; 2:CHIT; 3:CHAN; 4:Periodic hill; 5:STBL; 6:Cavity flow; 7:Actuator ...]
+  read(30,*) flowtype
+  if (flowtype.eq.1) then !!!   TO BE CHANGED
+     TGV  = .true.
+  elseif (flowtype.eq.2) then
+     CHIT = .true.
+  elseif (flowtype.eq.3) then
+     CHAN = .true.
+  elseif (flowtype.eq.4) then
+     PHILL = .true.
+  elseif (flowtype.eq.5) then
+     STBL = .true.
+  elseif (flowtype.eq.6) then
+     CAV = .true.
+  elseif (flowtype.eq.7) then
+     ACT = .true.
+  elseif (flowtype.eq.8) then
+     CYL = .true.
+  elseif (flowtype.eq.9) then
+     SHIT = .true.
+  elseif (flowtype.eq.10) then
+     TURB = .true.
+  elseif (flowtype.eq.11) then
+     LE = .true.
+  elseif (flowtype.eq.12) then
+     TE = .true.
+  elseif (flowtype.eq.0) then
+     SRC = .true.
+  endif
+
+  read(30,*) ! Directory (for post-processing mode)
+  read(30,*) ! ----------
+  read(30,*) dirDATA
+
+  ! Directory for grid files
+  ! ------------------------
+  dirGRID='.'
+  dirGRID='Grid_RANS_GO2'
+  dirGRID='Grid_RANS_CLOWT_WakeF'
+  dirGRID='Grid_LES_blunt'
+  dirGRID='Grid_LES_rough'
+  dirGRID='Grid3d_LES_rough'
+  dirGRID='Grid_LES_HU'
+  !dirGRID='.'
+  !dirGRID='Grid_RANS'
+  !dirGRID='Grid_RANS_GO2'
+  dirGRID='Grid_LES_CLOWT_fine2'
+  !dirGRID='Grid3d_LES_rough'
+  dirGRID='Grid3d_LES_rough_fine'
+
+  ! Name for grid files
+  ! ------------------------
+  nameGRID='grid'
+  nameGRID='ls59c'
+  !nameGRID='ann_sect2'
+  !nameGRID='turb'
+  !nameGRID='ls59'
+  !nameGRID='inletc'
+  !nameGRID='cdnoz3D2'
+
+!!$  if (CHAN) then
+!!$     read(30,*) ! Bulk Reynolds number (enforced)
+!!$     read(30,*) Reb
+!!$     read(30,*) ! Centerline Reynolds number (enforced)
+!!$     read(30,*) Rec
+!!$     read(30,*) ! Total length of streamwise domain (divided by pi*hc)
+!!$     read(30,*) longx
+!!$     read(30,*) ! Wall-normal resolution (in wall scaling)
+!!$     read(30,*) dy0p
+!!$     read(30,*) ! Total length of spanwise domain (divided by pi*hc)
+!!$     read(30,*) longz
+!!$  elseif (STBL.or.SRC) then
+!!$     read(30,*) ! Condition limite entree (fonctions propres)
+!!$     read(30,*) is_entr_fp
+!!$     read(30,*) ! Forcing suction/blowing: not included
+!!$     read(30,*) 
+!!$     read(30,*) ! Sponge zone: not included
+!!$     read(30,*) 
+!!$  endif
+  !read(30,*)! =================================================================
+  !read(30,*)! MULTIBLOCK PARAMETERS
+  !read(30,*)! =================================================================
+  !! adjoint block case or not
+  !read(30,*) ! adjoint block case (T: neighbor block interfaces are coincided, F: half cell approach between the blocks)
+  !read(30,*) is_adjoint_block
+  !is_adjoint_block = .true.
+  !close(30)
+
+  ! Summation by part schemes
+  !is_SBP = .true.
+  !is_wall2 = .true.
+  
+  ! Use of one-sided communications
+  !is_comm_onesided = .true.
+
+  ! Numerical dissipation added to increment before IRS smoothing
+  !is_dissip_in_increments=.true.
+
+  ! Set number of ghost points ngh [shared in mod_ngh inside mod_grid.f90]
+  ! ==============================
+
+  ! number of ghost points corresponding to the stencil for Euler terms
+  ! -------------------------------------------------------------------
+  ngh  =(stencil-1)/2   ! (11pts-stencil)
+  ngh_r=(stencil_RANS-1)/2   ! (5/3pts-stencil)
+
+  ! number of ghost points corresponding to the stencil for viscous terms
+  ! ---------------------------------------------------------------------
+  if (iorder_visc.ne.0) then
+     ngh_v=iorder_visc/2
+  else
+     ngh_v=2 ! for Euler calculations keep 5-pt stencil USEFUL?? TO BE CHANGED
+     !is_SBP = .true.
+     is_wall2 = .true.
+  endif
+  ngh_v_r=ngh_r
+  !is_SBP = .true.
+  !is_wall2 = .true.
+
+  if (iproc==0) print *,'is_SBP',is_SBP,'is_wall2',is_wall2
+
+  ! TO BE COMPLETED   
+  if (ngh_v>ngh) then
+     if (iproc==0) print *,'The number of ghost points for viscous terms (ngh_v)'
+     if (iproc==0) print *,'cannot be greater than the general number of ghost points (ngh),'
+     if (iproc==0) print *,'which corresponds to the stencil for the discretization of Euler terms'     
+     call mpistop('Change discretization order of viscous terms', 0)
+  endif
+
+  if (is_residue) then
+     open(31,file='residuals.bin',form='unformatted',status='unknown')
+     rewind(31)
+  endif
+
+  if (Mach.ge.1) is_supersonic=.true.
+
+  ! Reference profiles for BC
+  ! usefull for Tam&Dong to have a target for mean values, except at imax
+  ! usefull for RFM just for imin
+  ! is_BC_ref attribute of BC initialized in init_BC_ref
+  is_read_ref = .false.
+  if ((is_RFM).and.(.not.CHAN)) is_BC_ref = .true.
+  if ((LE).or.(TE)) is_read_ref = .true.
+  ! cas test entrée tourbillon
+  if ((.not.is_vortex).and.(type_vortex.eq.-1)) then
+     BC_face(1,1)%is_mean_ref = .true.
+     is_read_ref = .false.
+  endif
+  ! TEMP for annulus
+  !is_BC_ref=.true.
+
+  is_read_ex=.false.
+  is_read_ex=.true.
+  if (.not.is_curv3) is_read_ex=.false.
+  
+  ! HUM??? TO BE CHANGED ??????????????????????????????????????????????????????????????????
+  if (is_adiab) T_wall = T_ref
+
+  ! Determine simulation type of RANS equations (options: RANS,DES97,DDES,DDES_SLA)
+  simulation_RANS = 'RANS'
+
+  ! Wall-model
+  is_wall_model = .false.
+  wm_model_type = "ALG" ! "ODE", "ALG"
+
+  ! Laminar boundary layer
+  ! to be added on param.ini
+  if (is_similarity) is_LBL = .true.
+
+  ! Type of display
+  verbose=.false.
+
+end subroutine read_param

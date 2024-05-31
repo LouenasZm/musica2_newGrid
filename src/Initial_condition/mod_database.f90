@@ -1,0 +1,702 @@
+!=================================================================================
+module mod_database
+!=================================================================================
+  !> Read databases of Turbulent Boundary Layer (TBL) flows
+  ! Preliminary version XG june 2021
+!=================================================================================
+  use mod_constant
+  use precision
+  use mod_mpi
+  use warnstop
+  implicit none
+  !-------------------------------------------------------------------------------
+  integer :: ny_db
+  ! database Re_tau & uinf/utau
+  real(wp) :: Re_tau_db,uinf_utau_db
+  ! database wall-normal grid (adimensionalized by delta99 or channel half-width h)
+  real(wp), dimension(:), allocatable :: y_db
+  ! Mean streamwise profile (adimensionalized by u_infty or u_bulk)
+  real(wp), dimension(:), allocatable :: um_db
+  ! Reynolds stresses (adimensionalized by u_infty^2)
+  real(wp), dimension(:), allocatable :: uu_db,vv_db,ww_db,uv_db,uw_db,vw_db
+  !-------------------------------------------------------------------------------
+  
+  !-------------------------------------------------------------------------------
+  
+contains
+
+  !===============================================================================
+  subroutine read_database(base,Re)
+  !===============================================================================
+    !> Read root-mean-square velocity fluctuations from TBL databases
+    !
+    ! INPUTS:
+    !   base: choose database (KTH, ...
+    !    Re : choose Reynolds number of velocity profiles
+    ! OUTPUTS for Turbulent Boundary Layer (TBL):
+    !   read four components of Reynolds stress tensor: uurms/u_inf^2
+    !                                                   vvrms/u_inf^2
+    !                                                   wwrms/u_inf^2
+    !                                                   uvrms/u_inf^2
+    !   other components uwrms,vwrms are zero    
+    !   yd : database grid y/delta99
+    !   nyd: number of points in the profiles
+  !===============================================================================
+    !> Read root-mean-square velocity fluctuations from CHAN databases
+    !
+    ! INPUTS:
+    !   base: choose database (MKM, V&K ...
+    !    Re : choose Reynolds number of velocity profiles
+    ! OUTPUTS for Turbulent Channel Flow (CHAN):
+    !   read four components of Reynolds stress tensor: uurms/u_inf^2 bulk ou tau
+    !                                                   vvrms/u_inf^2
+    !                                                   wwrms/u_inf^2
+    !                                                   uvrms/u_inf^2
+    !                                                   uwrms/u_inf^2
+    !                                                   vwrms/u_inf^2
+    !   yd : database grid y/h
+    !   nyd: number of points in the profiles
+  !===============================================================================
+    use mod_constant
+    implicit none
+    ! ----------------------------------------------------------------------------
+    character(3) :: base
+    real(wp) :: Re
+    ! ----------------------------------------------------------------------------
+    logical :: iexist
+    integer :: j
+    real(wp) :: ub_utau
+    real(wp), dimension(:), allocatable :: dummy
+    ! ----------------------------------------------------------------------------
+
+    select case (base)
+    ! ********************************************************************   
+    case ('KTH') ! DNS data TBL from KTH (Schlatter et al.)
+    ! ********************************************************************
+       
+       ! resolution: 8192x513x768 spectral modes
+       ! ----------
+       ny_db=513
+       
+       ! allocate profiles
+       ! -----------------
+       allocate(y_db(ny_db),um_db(ny_db),dummy(ny_db))    
+       allocate(uu_db(ny_db),vv_db(ny_db),ww_db(ny_db))    
+       allocate(uv_db(ny_db),uw_db(ny_db),vw_db(ny_db))
+       
+       ! read database
+       ! -------------
+       call read_database_KTH(Re,y_db,dummy,um_db,uu_db,vv_db,ww_db,uv_db,dummy,dummy,dummy, &
+                              dummy,dummy,dummy,dummy,dummy,dummy,dummy,uinf_utau_db,Re_tau_db)
+       ! stress tensor
+       ! -------------
+       uu_db=uu_db**2 ! [u -> u^2]
+       vv_db=vv_db**2 ! [v -> v^2]
+       ww_db=ww_db**2 ! [w -> w^2]
+       uw_db=0.0_wp
+       vw_db=0.0_wp
+       
+       ! write stress tensor to check profiles
+       ! -------------------------------------
+       if (iproc==0) then
+          open(30,file='rms_'//base//'.dat',form='formatted',status='unknown')
+          do j=1,ny_db
+             write(30,'(7f15.8)') y_db(j),uu_db(j),vv_db(j),ww_db(j),uv_db(j),uw_db(j),vw_db(j)
+          enddo
+          close(30)
+       endif
+
+       ! Save of u_tau
+       ! -------------
+       utau = u_ref/uinf_utau_db
+       
+       ! re-dimensionalization of mean profile
+       ! -------------------------------------
+       um_db=um_db/uinf_utau_db
+       
+       ! re-dimensionalization [wall units u_tau -> freestream u_infty]
+       ! ---------------------
+       uu_db=uu_db/uinf_utau_db**2
+       vv_db=vv_db/uinf_utau_db**2
+       ww_db=ww_db/uinf_utau_db**2
+       uv_db=uv_db/uinf_utau_db**2
+
+    ! ********************************************************************   
+    case ('Wen') ! DNS data TBL from IAG (Wenzel et al.)
+    ! ********************************************************************
+       
+       ! resolution
+       ! ----------
+       ny_db=180
+       
+       ! allocate profiles
+       ! -----------------
+       allocate(y_db(ny_db),um_db(ny_db),dummy(ny_db))    
+       allocate(uu_db(ny_db),vv_db(ny_db),ww_db(ny_db))    
+       allocate(uv_db(ny_db),uw_db(ny_db),vw_db(ny_db))
+       
+       ! read database
+       ! -------------
+       call read_database_Wenzel(Re,y_db,dummy,um_db,uu_db,vv_db,ww_db,uv_db,dummy,dummy,dummy, &
+                                 dummy,dummy,dummy,dummy,dummy,dummy,dummy,uinf_utau_db,Re_tau_db)
+       ! stress tensor
+       ! -------------
+       uu_db=uu_db**2 ! [u -> u^2]
+       vv_db=vv_db**2 ! [v -> v^2]
+       ww_db=ww_db**2 ! [w -> w^2]
+       uw_db=0.0_wp
+       vw_db=0.0_wp
+       
+       ! write stress tensor to check profiles
+       ! -------------------------------------
+       if (iproc==0) then
+          open(30,file='rms_'//base//'.dat',form='formatted',status='unknown')
+          do j=1,ny_db
+             write(30,'(7f15.8)') y_db(j),uu_db(j),vv_db(j),ww_db(j),uv_db(j),uw_db(j),vw_db(j)
+          enddo
+          close(30)
+       endif
+
+       ! Save of u_tau
+       ! -------------
+       utau = u_ref/uinf_utau_db
+       
+       ! re-dimensionalization of mean profile
+       ! -------------------------------------
+       um_db=um_db/uinf_utau_db
+       
+       ! re-dimensionalization [wall units u_tau -> freestream u_infty]
+       ! ---------------------
+       uu_db=uu_db/uinf_utau_db**2
+       vv_db=vv_db/uinf_utau_db**2
+       ww_db=ww_db/uinf_utau_db**2
+       uv_db=uv_db/uinf_utau_db**2
+
+       print *,'end database'
+
+    ! ********************************************************************
+    case ('LES') ! old LES data from us
+    ! ********************************************************************
+       ! Resolution: 8192x513x768 spectral modes
+       ny_db=91
+       ! allocate profiles
+       allocate(y_db(ny_db),dummy(ny_db))    
+       allocate(uu_db(ny_db),vv_db(ny_db),ww_db(ny_db))    
+       allocate(uv_db(ny_db),uw_db(ny_db),vw_db(ny_db)) 
+       ! read database
+       inquire(file='tensions.dat',exist=iexist)
+       if (.not.iexist) then
+          call mpistop('Data file tensions.dat does not exist!', 0)
+       endif
+       open(30,file='tensions.dat',form='formatted',status='unknown')
+       do j=1,ny_db
+          read(30,*) y_db(j),uu_db(j),vv_db(j),ww_db(j),uv_db(j),uw_db(j),vw_db(j)
+       enddo
+       close(30)
+       ! re-dimensionalization [wall units u_tau -> freestream u_infty]
+       !uu_db=uu_db/uinf_utau_db
+       !uu_db=uu_db**2 ! [u -> u^2]
+       !vv_db=vv_db/uinf_utau_db
+       !vv_db=vv_db**2 ! [v -> v^2]
+       !ww_db=ww_db/uinf_utau_db
+       !ww_db=ww_db**2 ! [w -> w^2]
+       !uv_db=uu_db/uinf_utau_db**2
+       !uw_db=0.0_wp
+       !vw_db=0.0_wp
+       
+    ! ********************************************************************   
+    case ('MKM') ! DNS data channel flow from Moser, Kim & Mansour (MKM)
+    ! ********************************************************************
+       
+       ! resolution
+       ! ----------
+       if (Re==180.0_wp) then
+          ny_db=129
+       else
+          ny_db=257
+       endif
+       
+       ! allocate profiles
+       ! -----------------
+       allocate(y_db(ny_db),um_db(ny_db),dummy(ny_db))    
+       allocate(uu_db(ny_db),vv_db(ny_db),ww_db(ny_db))    
+       allocate(uv_db(ny_db),uw_db(ny_db),vw_db(ny_db))
+       
+       ! read database
+       ! -------------
+       call read_database_MKM(Re,y_db,dummy,um_db,dummy,dummy,dummy,dummy, &
+                              uu_db,vv_db,ww_db,uv_db,uw_db,vw_db,ub_utau)
+       
+       ! write stress tensor to check profiles
+       ! -------------------------------------
+       if (iproc==0) then
+          open(30,file='rms_'//base//'.dat',form='formatted',status='unknown')
+          do j=1,ny_db
+             write(30,'(8f15.8)') y_db(j),uu_db(j),vv_db(j),ww_db(j),uv_db(j),uw_db(j),vw_db(j),um_db(j)
+          enddo
+          close(30)
+       endif
+       
+       ! re-dimensionalization of mean profile
+       ! -------------------------------------
+       um_db=um_db/ub_utau
+       
+       ! re-dimensionalization [wall units u_tau -> freestream u_infty]
+       ! ---------------------
+       uu_db=uu_db/ub_utau**2
+       vv_db=vv_db/ub_utau**2
+       ww_db=ww_db/ub_utau**2
+       uv_db=uv_db/ub_utau**2
+
+    ! ********************************************************************
+    case default
+    ! ********************************************************************
+       call mpistop('not defined!', 0)
+    end select
+
+  end subroutine read_database
+
+  !===============================================================================
+  subroutine read_database_KTH(Re,yd99,yp,Up,urmsp,vrmsp,wrmsp,uvp,prmsp,pup,pvp, &
+                               Su,Fu,dUpdyp,Vp,omxrmsp,omyrmsp,omzrmsp,uinf_utau,Re_tau)
+  !===============================================================================
+    !> Read zero-pressure-gradient Turbulent Boundary Layer (TBL) KTH database
+    !
+    ! References:
+    ! -----------
+    ! Schlatter and Orlu, 2010, J. Fluid Mech., 659 (2010)
+    ! Schlatter et al., 2009, Bulletin APS, 54:19, page 59
+    !
+    ! Website:
+    ! --------
+    ! https://www.mech.kth.se/~pschlatt/DATA/
+  !===============================================================================
+    implicit none
+    ! ----------------------------------------------------------------------------
+    ! INPUT: Reynolds number based on momentum thickness 
+    real(wp) :: Re
+    ! OUTPUTS: mean and rms wall-normal profiles
+    real(wp), dimension(:) :: yd99,yp,Up,urmsp,vrmsp,wrmsp,uvp,prmsp
+    real(wp), dimension(:) :: pup,pvp,Su,Fu,dUpdyp,Vp
+    real(wp), dimension(:) :: omxrmsp,omyrmsp,omzrmsp    
+    real(wp) :: uinf_utau,Re_tau
+    ! ----------------------------------------------------------------------------
+    integer :: j,nyd
+    character(4) :: aRe
+    logical :: iexist
+    character(70) :: dirDATABASE
+    character(100) :: filename
+    real(wp) :: Re_theta,Re_deltas,H12,c_f
+    ! ----------------------------------------------------------------------------
+    
+    ! Directory where KTH database is stored
+    ! ======================================
+    dirDATABASE='/home/xavier/SCAN_TBL/Schlatter/DNS2010/'
+    !dirDATABASE='./'
+    !dirDATABASE='/data/Calculs/Database/TBL/Schlatter/DNS2010/'
+
+    ! Choose Reynolds number Re_theta
+    ! ===============================
+    ! available Re_theta: 0670 1000 1410 2000 2540 3030 3270 3630 3970 4060   
+    ! [-> input argument]
+    ! convert to string
+    write(aRe,FMT='(I4.4)') int(Re)
+    
+    ! Check if file is present
+    ! ========================
+    filename=trim(dirDATABASE)//'vel_'//aRe//'_dns.prof'
+    inquire(file=trim(filename),exist=iexist)
+    if (.not.iexist) then
+       call mpistop('Data file '//trim(filename)//' does not exist!',1)
+    endif
+    
+    ! KTH database informations
+    ! =========================
+    ! DNS Data, last update: 2012-05-27
+    ! Resolution: 8192x513x768 spectral modes
+    nyd=513
+
+    !=============================================================================
+    open(30,file=trim(filename))
+    rewind(30)
+    !=============================================================================
+    read(30,*)! DNS of a turbulent zero-pressure gradient boundary layer
+    read(30,*)! References:
+    read(30,*)! Schlatter and Orlu, 2010, J. Fluid Mech., 659
+    read(30,*)! Schlatter et al., 2009, Bulletin APS, 54:19, page 59
+    read(30,*)!
+    read(30,*)! Integral quantities:
+    read(30,'(21x,f11.3)') Re_theta
+    read(30,'(21x,f11.3)') Re_deltas
+    read(30,'(21x,f11.4)') Re_tau
+    read(30,'(21x,f11.6)') H12
+    read(30,'(21x,f11.9)') c_f
+    read(30,*)!===================================================================
+    read(30,*)! Wall-normal profiles:
+    read(30,*)! y/\delta_{99} | y+ | U+ | urms+ | vrms+ | wrms+ | uv+ | prms+
+    ! | pu+ | pv+ | S(u) | F(u) | dU+/dy+ | V+ | omxrms^+ | omyrms^+ | omzrms^+
+    do j=1,nyd
+       read(30,'(f13.7,2x,f13.7,15(1x,f11.7))') yd99(j),yp(j),Up(j),    &
+            urmsp(j),vrmsp(j),wrmsp(j),uvp(j),prmsp(j),pup(j),pvp(j),   &
+            Su(j),Fu(j),dUpdyp(j),Vp(j),omxrmsp(j),omyrmsp(j),omzrmsp(j)
+    enddo
+    !=============================================================================
+
+    ! u_infty/u_tau
+    ! =============
+    uinf_utau=Up(nyd)
+    
+    ! Print TBL info at screen
+    ! ========================
+    if ((iproc==0).and.(verbose)) then
+       print *,' ~> Read DNS data TBL from KTH (Schlatter et al.):'
+       print *,'    file: ',trim(filename)
+       print *,'    Re_theta  ',Re_theta
+       print *,'    Re_deltas ',Re_deltas
+       print *,'    Re_tau    ',Re_tau
+       print *,'    H12       ',H12
+       print *,'    c_f       ',c_f
+       print *,'    u_inf/u_tau',uinf_utau
+    endif
+
+  end subroutine read_database_KTH
+
+  !===============================================================================
+  subroutine read_database_Wenzel(Re,yd99,yp,Up,urmsp,vrmsp,wrmsp,uvp,prmsp,pup,pvp, &
+                                  Su,Fu,dUpdyp,Vp,omxrmsp,omyrmsp,omzrmsp,uinf_utau,Re_tau)
+  !===============================================================================
+    !> Read pressure-gradient compressible Turbulent Boundary Layer (TBL) Wenzel et al.
+    !
+    ! References:
+    ! -----------
+    ! Wenzel et al., 2018, J. Fluid Mech., 842:428–468. DOI:10.1017/jfm.2018.179
+    ! Wenzel et al., 2019, J. Fluid Mech., 880:239-283, DOI:10.1017/jfm.2019.670
+    ! Gibis et al. , 2019, J. Fluid Mech., 880:284-325, DOI:10.1017/jfm.2019.672
+    !
+    ! Website:
+    ! --------
+    ! https://?? supplementary material ??
+  !===============================================================================
+    implicit none
+    ! ----------------------------------------------------------------------------
+    ! INPUT: Reynolds number based on momentum thickness 
+    real(wp) :: Re
+    ! OUTPUTS: mean and rms wall-normal profiles
+    real(wp), dimension(:) :: yd99,yp,Up,urmsp,vrmsp,wrmsp,uvp,prmsp
+    real(wp), dimension(:) :: pup,pvp,Su,Fu,dUpdyp,Vp
+    real(wp), dimension(:) :: omxrmsp,omyrmsp,omzrmsp
+    real(wp) :: uinf_utau,Re_tau
+    ! ----------------------------------------------------------------------------
+    real(wp), dimension(:), allocatable :: Ue,Ve,Te,roe,pe,mue,nue,ae
+    integer :: j,nyd
+    character(3) :: aRe
+    logical :: iexist
+    character(70) :: dirDATABASE
+    character(100) :: filename
+    real(wp) :: Re_theta,Re_deltas,H12,c_f,dum
+    ! ----------------------------------------------------------------------------
+    
+    ! Directory where Wenzel's database is stored
+    ! ===========================================
+    dirDATABASE='/home/xavier/SCAN_TBL/Wenzel/cZPGTBL_data_wenzel_et_al/'
+    !dirDATABASE='./'
+    !dirDATABASE='/data/Calculs/Database/TBL/Schlatter/DNS2010/'
+
+    ! ONLY FOR M=2 temporarily
+    
+    ! Choose Reynolds number Re_theta
+    ! ===============================
+    ! available Re_tau: 252 359 450   
+    ! available Re_theta: 1116 1696 2214
+    ! [-> input argument]
+    if (Re==1116) Re_tau=252
+    if (Re==1696) Re_tau=359
+    if (Re==2214) Re_tau=450
+    ! convert to string
+    write(aRe,FMT='(I3.3)') int(Re_tau)
+    
+    ! Check if file is present
+    ! ========================
+    filename=trim(dirDATABASE)//'cZPGTBL_M2.00_Retau'//aRe//'.txt'
+    inquire(file=trim(filename),exist=iexist)
+    if (.not.iexist) then
+       call mpistop('Data file '//trim(filename)//' does not exist!',1)
+    endif
+    
+    ! Wenzel database informations
+    ! ============================
+    ! Resolution: 3100x205x512 for the main region
+    nyd=180
+    allocate(Ue(nyd),Ve(nyd),Te(nyd),roe(nyd),pe(nyd),mue(nyd),nue(nyd),ae(nyd))
+
+    !=============================================================================
+    open(30,file=trim(filename))
+    rewind(30)
+    !=============================================================================
+    read(30,*)! ==========================================================================================
+    read(30,*)! DNS data of zero-pressure-gradient turbulent boundary-layer at Mach=2.00,
+    read(30,*)! further Mach-number data between Mach=0.30 and 2.50 are available in additional files.
+    read(30,*)! ==========================================================================================
+    read(30,*)! Version 1.0 (Nov 16, 2018): create file by Christoph Wenzel
+    read(30,*)! 
+    read(30,*)! ------------------------------------------------------------------------------------------
+    read(30,*)! References:                                                                             
+    read(30,*)! - DNS of compressible turbulent boundary layers and assessment of data/scaling-law quality
+    read(30,*)!   Wenzel et al., 2018, J. Fluid Mech., 842
+    read(30,*)! 
+    read(30,*)! Notes:                                                                                  
+    read(30,*)! - If you are interested in data that are not listed in the table below (e.g. turbulent  
+    read(30,*)!   Mach number, Favre fluctuations, ... ), please feel free to contact me by email at    
+    read(30,*)!   wenzel@iag.uni-stuttgart.de.                                                          
+    read(30,*)!   The available data are computed as postprocessing of transient data, from which I can 
+    read(30,*)!   calculate further data at any time.                                                   
+    read(30,*)! - If you notice any discrepancies in the available data, I would be pleased to receive  
+    read(30,*)!   a brief notification (wenzel@iag.uni-stuttgart.de), I may have made mistakes in their 
+    read(30,*)!   writing out.                                                                          
+    read(30,*)! ------------------------------------------------------------------------------------------
+    read(30,*)! 
+    read(30,*)! ------------------------------------------------------------------------------------------
+    read(30,*)! Boundary-layer parameter:
+    read(30,*)! ------------------------------------------------------------------------------------------
+    !read(30,*)!Skin-friction coef.     =    0.0026350
+    read(30,'(27x,f11.7)') c_f
+    read(30,*)!
+    read(30,*)!------------------------------------------------------------------------------------------
+    read(30,*)!Reynolds numbers:
+    read(30,*)!------------------------------------------------------------------------------------------
+    !read(30,*)!Re_tau                  =     449.9687
+    read(30,'(27x,f11.4)') Re_tau
+    read(30,*)!Re_delta99              =   23917.0970
+    !read(30,*)!Re_deltaStar            =    7146.2486
+    read(30,'(27x,f11.4)') Re_deltas
+    read(30,*)!Re_deltaStar_w          =    2834.2283
+    !read(30,*)!Re_theta                =    2214.0954
+    read(30,'(27x,f11.4)') Re_theta
+    read(30,*)!Re_theta_w              =    1499.8226
+    read(30,*)!
+    read(30,*)!------------------------------------------------------------------------------------------
+    read(30,*)!Shape factors:
+    read(30,*)!------------------------------------------------------------------------------------------
+    read(30,*)!deltaStar     / delta99 =       0.2988
+    read(30,*)!deltaStar_inc / delta99 =       0.1696
+    read(30,*)!theta         / delta99 =       0.0926
+    read(30,*)!theta_inc     / delta99 =       0.1185
+    !read(30,*)!H12                     =       3.2276
+    read(30,'(27x,f11.4)') H12
+    read(30,*)!H12_inc                 =       1.4316
+    read(30,*)!
+    read(30,*)!------------------------------------------------------------------------------------------
+    read(30,*)!Turbulent quantities:
+    read(30,*)!------------------------------------------------------------------------------------------
+    read(30,*)!u_rms+_max              =       2.6449
+    read(30,*)!y+(u_rms+_max)          =      12.8049
+    read(30,*)!
+    read(30,*)!------------------------------------------------------------------------------------------
+    read(30,*)!Wall-normal profiles up to y/delta99 <= 4:
+    read(30,*)!------------------------------------------------------------------------------------------
+    read(30,*)! y/delta_99 | y+ | u+ | u_vd+ | v+ | u_rms+ | v_rms+ | w_rms+ | uv+ | t_rms+ | rho_rms+
+    ! | sqrt(r/r_w) | omx+| omy+ | omz+ | u/u_e | v/u_e | T/T_e | r/r_e | p/p_e  |mu/mu_e | nu/nu_e | a/a_e
+
+    read(30,*)!===================================================================
+    read(30,*)! Wall-normal profiles:
+    read(30,*)! y/\delta_{99} | y+ | U+ | urms+ | vrms+ | wrms+ | uv+ | prms+
+    ! | pu+ | pv+ | S(u) | F(u) | dU+/dy+ | V+ | omxrms^+ | omyrms^+ | omzrms^+
+    do j=1,nyd
+       read(30,'(f10.7,2x,f13.7,3(2x,f11.7),11(2x,f10.7),2x,f11.7,6(2x,f10.7))') &
+            yd99(j),yp(j),Up(j),dum,dum,urmsp(j),vrmsp(j),wrmsp(j),uvp(j),dum,dum,dum, &
+            omxrmsp(j),omyrmsp(j),omzrmsp(j),Ue(j),Ve(j),Te(j),roe(j),pe(j),mue(j),nue(j),ae(j)
+    enddo
+    !=============================================================================
+
+    ! u_infty/u_tau
+    ! =============
+    uinf_utau=Up(nyd)
+    
+    ! Print TBL info at screen
+    ! ========================
+    if ((iproc==0).and.(verbose)) then
+       print *,' ~> Read DNS data TBL from Wenzel et al.:'
+       print *,'    file: ',trim(filename)
+       print *,'    Mach      ',2.0
+       print *,'    Re_theta  ',Re_theta
+       print *,'    Re_deltas ',Re_deltas
+       print *,'    Re_tau    ',Re_tau
+       print *,'    H12       ',H12
+       print *,'    c_f       ',c_f
+       print *,'    u_inf/u_tau',uinf_utau
+    endif
+
+  end subroutine read_database_Wenzel
+
+  !===============================================================================
+  subroutine read_database_MKM(Re,yh,yp,Up,dUp,Vp,dVp,Pm, &
+                               uurmsp,vvrmsp,wwrmsp,uvrmsp,uwrmsp,vwrmsp,ub_utau)
+  !===============================================================================
+    !> Read DNS data channel flow from Moser, Kim & Mansour (MKM)
+    !
+    ! References:
+    ! -----------
+    ! Moser, Kim & Mansour, DNS of Turbulent Channel Flow up to Re_tau=590,
+    !                       Physics of Fluids, vol 11, 943-945 (1999)
+    ! Numerical Method: Kim, Moin & Moser, J. Fluid Mech. vol 177, 133-166 (1987)
+    !
+    ! Website:
+    ! --------
+    ! http://www.tam.uiuc.edu/Faculty/Moser/channel
+  !===============================================================================
+    implicit none
+    ! ----------------------------------------------------------------------------
+    ! INPUT: Reynolds number based on momentum thickness 
+    real(wp) :: Re
+    ! OUTPUTS: mean and rms wall-normal profiles
+    real(wp), dimension(:) :: yh,yp,Up,dUp,Vp,dVp,Pm
+    real(wp), dimension(:) :: uurmsp,vvrmsp,wwrmsp
+    real(wp), dimension(:) :: uvrmsp,uwrmsp,vwrmsp
+    real(wp) :: ub_utau
+    ! ----------------------------------------------------------------------------
+    integer :: j,nyd,nyd2
+    character(3) :: aRe
+    logical :: iexist
+    character(70) :: dirDATABASE
+    character(100) :: filename
+    real(wp) :: Re_tau
+    ! ----------------------------------------------------------------------------
+
+    if (iproc==0) then
+       print *,' ~> Read DNS data channel flow from Moser, Kim & Mansour (MKM):'
+    endif
+    
+    ! Directory where KTH database is stored
+    ! ======================================
+    ! dirDATABASE='/home/xavier/MUSICA3_multiblock/tests/chan/chandata/data_MKM/'
+    dirDATABASE='./chandata/data_MKM/'
+    dirDATABASE='/data/Calculs/Database/chandata/data_MKM/'
+
+    ! Choose Reynolds number Re_tau
+    ! =============================
+    ! available Re_theta: 180 395 590  
+    ! [-> input argument]
+    ! convert to string
+    write(aRe,FMT='(I3.3)') int(Re)
+    
+    ! MKM database informations
+    ! =========================
+    ! The data in this file was extracted from a direct numerical
+    ! simulation of fully developed plane turbulent channel
+    ! flow. Particulars are listed below. Note that some of the statistical
+    ! quantities provided in this data set should be zero due to
+    ! (statistical) symmetries in the flow. These quantities are reported
+    ! here none-the-less as an indicator of the quality of the statistics.
+    if (aRe=='180') then
+       nyd=129
+    else
+       nyd=257
+    endif
+    ! only half-width in files
+    nyd2=(nyd+1)/2
+
+    ! Mean velocities and their derivatives and mean pressure
+    ! =======================================================
+
+    ! Check if file is present
+    ! ------------------------
+    filename=trim(dirDATABASE)//'chan'//aRe//'/profiles/chan'//aRe//'.means'
+    inquire(file=trim(filename),exist=iexist)
+    if (.not.iexist) then
+       call mpistop('Data file '//trim(filename)//' does not exist!', 0)
+    endif
+    
+    ! Open and read
+    ! -------------
+    open(30,file=trim(filename))
+    ! read header
+    do j=1,21
+       read(30,*)
+    enddo
+    read(30,'(17x,f7.2)') Re_tau
+    do j=1,3
+       read(30,*)
+    enddo
+    ! read: y | y+ | Umean | dUmean/dy | Wmean | dWmean/dy | Pmean
+    do j=1,nyd2
+       read(30,'(7(1X,1E12.4))') yh(j),yp(j),Up(j),dUp(j),Vp(j),dVp(j),Pm(j)
+    enddo
+    
+    ! Reconstruct full channel
+    ! ------------------------
+    ! grid
+    yh(1:nyd2)=yh(1:nyd2)-1.0_wp
+    do j=nyd2+1,nyd
+       yh(j)=-yh(nyd-j+1)
+    enddo
+    ! velocities
+    do j=nyd2+1,nyd
+        Up(j)= Up(nyd-j+1)
+       dUp(j)=dUp(nyd-j+1)
+        Vp(j)= Vp(nyd-j+1)
+       dVp(j)=dVp(nyd-j+1)
+        Pm(j)=Pm(nyd-j+1)
+    enddo
+    
+    ! Bulk velocity: u_bulk/u_tau
+    ! ---------------------------
+    ub_utau=0.0_wp
+    do j=1,nyd-1
+       ub_utau=ub_utau+(Up(j+1)+Up(j))*(yh(j+1)-yh(j))*0.5_wp
+    enddo
+    ub_utau=ub_utau*0.5_wp
+
+    ! Components of the Reynolds stress tensor
+    ! ========================================
+
+    ! Check if file is present
+    ! ------------------------
+    filename=trim(dirDATABASE)//'chan'//aRe//'/profiles/chan'//aRe//'.reystress'
+    inquire(file=trim(filename),exist=iexist)
+    if (.not.iexist) then
+       call mpistop('Data file '//trim(filename)//' does not exist!', 0)
+    endif
+    
+    ! Open and read
+    ! -------------
+    open(30,file=trim(filename))
+    ! read header
+    do j=1,25
+       read(30,*)
+    enddo
+    ! read: y | y+ | R_uu | R_vv | R_ww | R_uv | R_uw  | R_vw 
+    do j=1,nyd2
+      read(30,'(8(1X,1E12.4))') yh(j),yp(j),uurmsp(j),vvrmsp(j),wwrmsp(j),&
+                                            uvrmsp(j),uwrmsp(j),vwrmsp(j)
+    enddo
+
+    ! Reconstruct full channel
+    ! ------------------------
+    ! grid
+    yh(1:nyd2)=yh(1:nyd2)-1.0_wp
+    do j=nyd2+1,nyd
+       yh(j)=-yh(nyd-j+1)
+    enddo
+    ! velocities
+    do j=nyd2+1,nyd
+       uurmsp(j)=uurmsp(nyd-j+1)
+       vvrmsp(j)=vvrmsp(nyd-j+1)
+       wwrmsp(j)=wwrmsp(nyd-j+1)
+       uvrmsp(j)=-uvrmsp(nyd-j+1)
+       uwrmsp(j)=-uwrmsp(nyd-j+1)*0.0_wp
+       vwrmsp(j)=-vwrmsp(nyd-j+1)*0.0_wp
+    enddo
+    uwrmsp=0.0_wp
+    vwrmsp=0.0_wp
+        
+    ! Print TBL info at screen
+    ! ========================
+    if (iproc==0) then
+       print *,'    file: ',trim(filename)
+       print *,'    Re_tau      ',Re_tau
+       print *,'    u_bulk/u_tau',ub_utau
+    endif
+
+  end subroutine read_database_MKM
+
+end module mod_database

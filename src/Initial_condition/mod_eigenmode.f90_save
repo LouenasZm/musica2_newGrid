@@ -1,0 +1,1011 @@
+!=================================================================================
+module mod_eigenmode
+!=================================================================================
+  !> Read and enter eigenfunctions of unstable modes in the inlet plane
+  ! Preliminary version XG 28/02/2020
+  ! restricted to perfect gas and 5 points BC
+  ! restricted to 2D (periodic) configuration  
+!=================================================================================
+  use mod_constant
+  use mod_mpi
+  use mod_flow
+  use mod_eos
+  implicit none
+  !-------------------------------------------------------------------------------
+  ! indicator to enter eigenmodes at inlet
+  logical :: is_eigenmode
+  !-------------------------------------------------------------------------------
+  ! from stability code
+  character(len=50) :: ncas ! Name of the eigenfunctions
+  integer :: ndata          ! Number of points discretizing the eigenfunctions
+  logical :: is_oblique     ! Oblique modes (+/- beta)
+  real(wp) :: limy          ! upper limit of the definition of eigenfunctions
+  logical :: isro           ! if eigenfunction for rho is available
+  real(wp), dimension(:), allocatable :: Qr,Qi,yd
+  !-------------------------------------------------------------------------------
+  ! eigenmode type
+  type eigenmode
+     real(wp) :: om,kr,ki,beta,ampl
+     real(wp), dimension(:), pointer :: ur,ui,dur,dui
+     real(wp), dimension(:), pointer :: vr,vi,dvr,dvi
+     real(wp), dimension(:), pointer :: wr,wi,dwr,dwi
+     real(wp), dimension(:), pointer :: pr,pi,dpr,dpi
+     real(wp), dimension(:), pointer :: rr,ri,drr,dri
+     real(wp), dimension(:), pointer :: tr,ti,dtr,dti
+  end type eigenmode
+  !-------------------------------------------------------------------------------
+  ! eigenmodes
+  integer :: n_eig
+  type(eigenmode), dimension(:), pointer :: eig
+  !-------------------------------------------------------------------------------
+  
+contains
+
+  !===============================================================================
+  subroutine init_eigenmodes
+  !===============================================================================
+    !> Initialization of eigenfunctions
+  !===============================================================================
+    implicit none
+    ! ----------------------------------------------------------------------------
+    integer :: k!,j
+    ! ----------------------------------------------------------------------------
+
+    if (iproc==0) then
+       print *,repeat('=',70)
+       print *,'Init eigenmodes'
+       print *,repeat('=',70)
+    endif
+
+    ! Read unstable mode parameters to define eigenmodes
+    ! ==================================================
+    call read_param_stab
+
+    ! Dimensionalize eigenmodes wavenumbers and frequency
+    ! ===================================================
+    ! Nota : L_ref=h_ref for step case and L_ref=deltas_forc for STBL
+    
+    ! ---> dans setupref.f90
+    !omeg_sb = omeg_sb/deltas_forc*u_ref
+    !if (is_2d) then
+    !   beta_sb = 0.0_wp
+    !else
+    !   beta_sb = beta_sb/deltas_forc
+    !endif
+    
+    do k=1,n_eig
+       eig(k)%om=eig(k)%om/L_ref*u_ref
+       eig(k)%kr=eig(k)%kr/L_ref
+       eig(k)%ki=eig(k)%ki/L_ref
+       eig(k)%beta=eig(k)%beta/L_ref
+    enddo
+
+    ! Allocate memory for eigenfunctions
+    ! ==================================
+    do k=1,n_eig
+       allocate(eig(k)%ur(ny),eig(k)%ui(ny),eig(k)%dur(ny),eig(k)%dui(ny))
+       allocate(eig(k)%vr(ny),eig(k)%vi(ny),eig(k)%dvr(ny),eig(k)%dvi(ny))
+       allocate(eig(k)%wr(ny),eig(k)%wi(ny),eig(k)%dwr(ny),eig(k)%dwi(ny))
+       allocate(eig(k)%pr(ny),eig(k)%pi(ny),eig(k)%dpr(ny),eig(k)%dpi(ny))
+       allocate(eig(k)%rr(ny),eig(k)%ri(ny),eig(k)%drr(ny),eig(k)%dri(ny))
+       allocate(eig(k)%tr(ny),eig(k)%ti(ny),eig(k)%dtr(ny),eig(k)%dti(ny))
+    enddo
+        
+    allocate(Qr(ndata),Qi(ndata),yd(ndata))
+    ! isro=F -> classical LST solver: T profile is given and rho is deduced
+    ! isro=T -> LST solver with 5 variables: rho profile directly available
+    isro=.true.
+
+    ! Eigenfunctions
+    ! ==============
+    do k=1,n_eig
+       !if (k==1) ncas='_M0p9_w0p1_3d'
+       !if (k==2) ncas='_M0p9_w0p1_3d'
+       !if (k==3) ncas='_M0p9_w0p2_2d'
+       call def_eigenfunction(eig(k))
+    enddo
+
+!!$    ! check
+!!$    if (iproc==0) then
+!!$       open(40,file='eig_interp2.bin',form='unformatted',status='unknown')
+!!$       rewind(40)
+!!$       write(40) ny
+!!$       write(40) (y(j),j=1,ny)
+!!$       write(40) (eig(1)%ur(j),j=1,ny)
+!!$       write(40) (eig(1)%ui(j),j=1,ny)
+!!$       write(40) (eig(1)%vr(j),j=1,ny)
+!!$       write(40) (eig(1)%vi(j),j=1,ny)
+!!$       write(40) (eig(1)%wr(j),j=1,ny)
+!!$       write(40) (eig(1)%wi(j),j=1,ny)
+!!$       write(40) (eig(1)%pr(j),j=1,ny)
+!!$       write(40) (eig(1)%pi(j),j=1,ny)
+!!$       write(40) (eig(1)%tr(j),j=1,ny)
+!!$       write(40) (eig(1)%ti(j),j=1,ny)
+!!$       write(40) (eig(1)%rr(j),j=1,ny)
+!!$       write(40) (eig(1)%ri(j),j=1,ny)
+!!$       close(40)
+!!$    endif
+!!$    call mpistop('check eigenmodes',0)
+    
+    ! free memory
+    deallocate(Qr,Qi,yd)
+    if (iproc==0) print *,repeat('=',70)
+
+  end subroutine init_eigenmodes
+  
+  !===============================================================================
+  subroutine read_param_stab
+  !===============================================================================
+    !> Read parameters in param_stab.ini
+  !===============================================================================
+    implicit none
+    ! ----------------------------------------------------------------------------
+    logical :: iexist
+    integer :: k,km,neig_read
+    real(wp) :: psi
+    ! ----------------------------------------------------------------------------
+
+    ! Read param_stab.ini
+    ! ===================
+    inquire(file=trim(dirDATA)//'param_stab.ini', exist=iexist)
+    if (.not.iexist) then
+       call mpistop('Paramfile param_stab.ini does not exist!', 0)
+    endif
+    
+    !=============================================================================
+    open(30,file=trim('param_stab.ini'))
+    !=============================================================================
+    read(30,*)! ==================================================================
+    read(30,*)! UNSTABLE MODE PARAMETERS (determined with stability solver)
+    read(30,*)! ==================================================================
+    read(30,*)! 
+    read(30,*)! Name of the eigenfunctions
+    read(30,*) ncas
+    ncas='_'//trim(ncas)
+    read(30,*)! Number of unstable modes
+    read(30,*) neig_read
+    read(30,*)! Oblique modes (+/- beta)
+    read(30,*) is_oblique
+    if (is_oblique) then
+       n_eig=neig_read+1
+    else
+       n_eig=neig_read
+    endif
+    read(30,*)! Number of points discretizing the eigenfunctions
+    read(30,*) ndata
+    read(30,*)! upper limit of the definition of eigenfunctions
+    read(30,*) limy
+
+    ! Print number and name of eigenmodes
+    ! ===================================
+    if (iproc==0) then
+       write(6,'(''    Number of eigenmodes:'',i3)') n_eig
+       print *,'~> eigenmode name: fpropre_*'//trim(ncas)//'.dat'
+    endif
+
+    ! Allocate eigmode type
+    ! =====================
+    allocate(eig(n_eig))
+ 
+    ! Read eigenmode characteristics
+    ! ==============================
+    km=1
+    do k=1,neig_read
+       
+       read(30,*)! ==================================================================
+       read(30,*)! Parameters of mode
+       read(30,*)! ==================================================================
+       read(30,*)! angular frequency
+       read(30,*) eig(km)%om
+       read(30,*)! real part of streamwise wavenumber
+       read(30,*) eig(km)%kr
+       read(30,*)! imaginary part of streamwise wavenumber
+       read(30,*) eig(km)%ki
+       read(30,*)!~> define 'wave angle' OR 'spanwise wavenumber'
+                 !   (the first non-zero is taken into account)
+       read(30,*)! wave angle: psi [in degrees]
+       read(30,*) psi
+       if (psi.ne.0.0_wp) then
+          ! compute spanwise wavenumber from wave angle
+          ! -------------------------------------------
+          eig(km)%beta=eig(km)%kr*tan(psi*pi/180.0_wp)
+          read(30,*)! spanwise wavenumber is ignored
+          read(30,*) 
+       else
+          read(30,*)! spanwise wavenumber: beta
+          read(30,*) eig(km)%beta
+       endif
+       read(30,*)! amplitude of mode excitation 
+       read(30,*) eig(km)%ampl
+       ! duplicate mode with -beta if is_oblique
+       ! ---------------------------------------
+       if (eig(km)%beta.ne.0.0_wp) then
+          if (is_oblique) then
+             eig(km+1)%om  = eig(km)%om
+             eig(km+1)%kr  = eig(km)%kr
+             eig(km+1)%ki  = eig(km)%ki
+             eig(km+1)%beta=-eig(km)%beta
+             eig(km+1)%ampl= eig(km)%ampl
+             km=km+2
+          else
+             km=km+1
+          endif
+       else
+          km=km+1
+       endif
+       
+    enddo
+    close(30)
+    !=============================================================================
+
+    ! Print nondimensional wavenumbers and frequency
+    ! ==============================================
+    if (iproc==0) then
+       do k=1,n_eig
+          write(6,*) '   ------------------'
+          write(6,20) k
+          write(6,*) '   ------------------'
+          write(6,21) eig(k)%om
+          write(6,22) eig(k)%kr,eig(k)%ki
+          write(6,23) eig(k)%beta
+          write(6,24) eig(k)%ampl
+          write(6,25) 2.*pi/eig(k)%kr
+          write(6,26) 2.*pi/eig(k)%kr*L_ref/(x(2)-x(1))
+       enddo
+    endif
+20  format(4x,'Mode',i3)
+21  format(4x,'angular frequency     (wL/U):',f8.4)
+22  format(4x,'streamwise wavenumber  (k L):',f8.5,'+i*',f8.5)
+23  format(4x,'spanwise wavenumber (beta L):',f8.2)
+24  format(4x,'amplitude of mode      (eps):',f8.5)
+25  format(4x,'wavelength        (lambda/L):',f8.2)
+26  format(4x,'wavelength       (lambda/dx):',f8.2)
+
+  endsubroutine read_param_stab
+
+  !===============================================================================
+  subroutine def_eigenfunction(eg)
+  !===============================================================================
+    !> Define eigenfunctions (read, interpolate, derive)
+    !===================================================
+    ! we need eigenfunction profiles for primitive variables (ui,p,rho)
+    ! isro=F -> classical LST solver: T profile is given and rho is deduced
+    ! isro=T -> LST solver with 5 variables: rho profile directly available
+  !===============================================================================
+    implicit none
+    ! ----------------------------------------------------------------------------
+    type(eigenmode) :: eg
+    ! ----------------------------------------------------------------------------
+    integer :: j
+    ! eigenfunctions on global grid
+    real(wp), dimension(ngy) :: Qru_g,Qiu_g,dQru_g,dQiu_g
+    real(wp), dimension(ngy) :: Qrv_g,Qiv_g,dQrv_g,dQiv_g
+    real(wp), dimension(ngy) :: Qrw_g,Qiw_g,dQrw_g,dQiw_g
+    real(wp), dimension(ngy) :: Qrp_g,Qip_g,dQrp_g,dQip_g
+    real(wp), dimension(ngy) :: Qrro_g,Qiro_g,dQrro_g,dQiro_g
+    real(wp), dimension(ngy) :: Qrt_g,Qit_g,dQrt_g,dQit_g
+    real(wp), dimension(ngy) :: prs_in,Temp_in,rho_in
+    ! adim
+    real(wp) :: p_infty
+    ! ----------------------------------------------------------------------------
+
+    if (iproc==0) print *,'~> read and interpolate eigenfunctions'
+
+    ! Velocity component u
+    ! ====================
+    ! read, interpolate, derive
+    call read_eigenfunction('u',Qru_g,Qiu_g,dQru_g,dQiu_g)
+
+    ! dimensionalize
+    Qru_g =eg%ampl*U_ref*Qru_g
+    Qiu_g =eg%ampl*U_ref*Qiu_g
+    dQru_g=eg%ampl*U_ref*dQru_g
+    dQiu_g=eg%ampl*U_ref*dQiu_g
+
+    ! fill on local grid
+    allocate(eg%ur(ny),eg%ui(ny),eg%dur(ny),eg%dui(ny))
+    do j=1,ny
+       eg%ur(j) =Qru_g(j+coord(2)*ny)
+       eg%ui(j) =Qiu_g(j+coord(2)*ny)
+       eg%dur(j)=dQru_g(j+coord(2)*ny)
+       eg%dui(j)=dQiu_g(j+coord(2)*ny)
+    enddo
+    
+    ! Velocity component v
+    ! ====================
+    ! read, interpolate, derive
+    call read_eigenfunction('v',Qrv_g,Qiv_g,dQrv_g,dQiv_g)
+
+    ! dimensionalize
+    Qrv_g =eg%ampl*U_ref*Qrv_g
+    Qiv_g =eg%ampl*U_ref*Qiv_g
+    dQrv_g=eg%ampl*U_ref*dQrv_g
+    dQiv_g=eg%ampl*U_ref*dQiv_g
+
+    ! fill on local grid
+    allocate(eg%vr(ny),eg%vi(ny),eg%dvr(ny),eg%dvi(ny))
+    do j=1,ny
+       eg%vr(j) =Qrv_g(j+coord(2)*ny)
+       eg%vi(j) =Qiv_g(j+coord(2)*ny)
+       eg%dvr(j)=dQrv_g(j+coord(2)*ny)
+       eg%dvi(j)=dQiv_g(j+coord(2)*ny)
+    enddo
+    
+    ! Velocity component w
+    ! ====================
+    if (is_2d) then
+       Qrw_g = 0.0_wp
+       Qiw_g = 0.0_wp
+       dQrw_g= 0.0_wp
+       dQiw_g= 0.0_wp
+    else
+       ! read, interpolate, derive
+       call read_eigenfunction('w',Qrw_g,Qiw_g,dQrw_g,dQiw_g)
+
+       ! dimensionalize
+       Qrw_g =eg%ampl*U_ref*Qrw_g
+       Qiw_g =eg%ampl*U_ref*Qiw_g
+       dQrw_g=eg%ampl*U_ref*dQrw_g
+       dQiw_g=eg%ampl*U_ref*dQiw_g
+    endif
+    
+    ! fill on local grid
+    allocate(eg%wr(ny),eg%wi(ny),eg%dwr(ny),eg%dwi(ny))
+    do j=1,ny
+       eg%wr(j) =Qrw_g(j+coord(2)*ny)
+       eg%wi(j) =Qiw_g(j+coord(2)*ny)
+       eg%dwr(j)=dQrw_g(j+coord(2)*ny)
+       eg%dwi(j)=dQiw_g(j+coord(2)*ny)
+    enddo
+    
+    ! Pressure p
+    ! ==========
+    ! read, interpolate, derive
+    call read_eigenfunction('p',Qrp_g,Qip_g,dQrp_g,dQip_g)
+
+    ! dimensionalize
+    p_infty=rho_ref*U_ref**2
+    Qrp_g =eg%ampl*p_infty*Qrp_g
+    Qip_g =eg%ampl*p_infty*Qip_g
+    dQrp_g=eg%ampl*p_infty*dQrp_g
+    dQip_g=eg%ampl*p_infty*dQip_g
+
+    ! fill on local grid
+    allocate(eg%pr(ny),eg%pi(ny),eg%dpr(ny),eg%dpi(ny))
+    do j=1,ny
+       eg%pr(j) =Qrp_g(j+coord(2)*ny)
+       eg%pi(j) =Qip_g(j+coord(2)*ny)
+       eg%dpr(j)=dQrp_g(j+coord(2)*ny)
+       eg%dpi(j)=dQip_g(j+coord(2)*ny)
+    enddo
+
+    ! Pressure p
+    ! ==========
+    ! read, interpolate, derive
+    call read_eigenfunction('T',Qrt_g,Qit_g,dQrt_g,dQit_g)
+
+    ! dimensionalize
+    Qrt_g =eg%ampl*T_ref*Qrt_g
+    Qit_g =eg%ampl*T_ref*Qit_g
+    dQrt_g=eg%ampl*T_ref*dQrt_g
+    dQit_g=eg%ampl*T_ref*dQit_g
+
+    ! fill on local grid
+    allocate(eg%tr(ny),eg%ti(ny),eg%dtr(ny),eg%dti(ny))
+    do j=1,ny
+       eg%tr(j) =Qrt_g(j+coord(2)*ny)
+       eg%ti(j) =Qit_g(j+coord(2)*ny)
+       eg%dtr(j)=dQrt_g(j+coord(2)*ny)
+       eg%dti(j)=dQit_g(j+coord(2)*ny)
+    enddo
+
+    ! Density rho
+    ! ===========
+    if (isro) then
+       ! read, interpolate, derive
+       call read_eigenfunction('rho',Qrro_g,Qiro_g,dQrro_g,dQiro_g)
+
+       ! dimensionalize
+       Qrro_g =eg%ampl*rho_ref*Qrro_g
+       Qiro_g =eg%ampl*rho_ref*Qiro_g
+       dQrro_g=eg%ampl*rho_ref*dQrro_g
+       dQiro_g=eg%ampl*rho_ref*dQiro_g
+
+    else ! we read T profile and reconstruct rho from T and p
+       ! read, interpolate, derive
+       call read_eigenfunction('T',Qrt_g,Qit_g,dQrt_g,dQit_g)
+
+       ! reconstruct rho and dimensionalize
+       Qrt_g =eg%ampl*T_ref*Qrt_g
+       Qit_g =eg%ampl*T_ref*Qit_g
+       ! inlet quantities
+       prs_in=p_ref
+       Temp_in=T_ref
+       rho_in=prs_in/Temp_in/rg
+       
+       Qrro_g=(prs_in+Qrp_g)/(Temp_in+Qrt_g)/rg-rho_in
+       Qiro_g=(prs_in+Qip_g)/(Temp_in+Qit_g)/rg-rho_in
+      
+       ! derivative with respect to y
+       dQrro_g(1)=(Qrro_g(2)-Qrro_g(1))/(yg(2)-yg(1))
+       do j=2,ngy-1
+          dQrro_g(j)=(Qrro_g(j+1)-Qrro_g(j-1))/(yg(j+1)-yg(j-1))
+       enddo
+       dQrro_g(ngy)=0.0_wp       
+       
+       dQiro_g(1)=(Qiro_g(2)-Qiro_g(1))/(yg(2)-yg(1))       
+       do j=2,ngy-1
+          dQiro_g(j)=(Qiro_g(j+1)-Qiro_g(j-1))/(yg(j+1)-yg(j-1))
+       enddo
+       dQiro_g(ngy)=0.0_wp
+    endif
+    
+    ! fill on local grid
+    allocate(eg%rr(ny),eg%ri(ny),eg%drr(ny),eg%dri(ny))
+    do j=1,ny
+       eg%rr(j) =Qrro_g(j+coord(2)*ny)
+       eg%ri(j) =Qiro_g(j+coord(2)*ny)
+       eg%drr(j)=dQrro_g(j+coord(2)*ny)
+       eg%dri(j)=dQiro_g(j+coord(2)*ny)
+    enddo
+    
+    if (iproc==0) print *,'~> read eigenfunctions OK'
+
+  end subroutine def_eigenfunction
+
+  !===============================================================================
+  subroutine read_eigenfunction(varname,Qr_g,Qi_g,dQr_g,dQi_g)
+  !===============================================================================
+    !> Read, interpolate and derive an eigenfunction on global grid
+  !===============================================================================
+    use mod_utils
+    use mod_interp1 ! <- module for 1D interpolation [Mathematics]
+    implicit none
+    ! ----------------------------------------------------------------------------
+    character(len=*)  :: varname
+    real(wp), dimension(ngy), intent(out) :: Qr_g,Qi_g,dQr_g,dQi_g
+    ! ----------------------------------------------------------------------------
+    ! local var
+    integer :: j,uid
+    ! ----------------------------------------------------------------------------
+
+    ! Load eigenfunction from file
+    ! ============================
+    call get_free_unit(uid)
+    if (iproc==0) print *,'   fpropre_'//trim(varname)//trim(ncas)//'.dat'
+    open(unit=uid,file='fpropre_'//trim(varname)//trim(ncas)//'.dat',form='formatted',status='unknown')
+    read(uid,*)
+    read(uid,*)
+    do j=1,ndata
+       read(uid,*) yd(j),Qr(j),Qi(j)
+    enddo
+    close(uid)
+    
+    ! Interpolate data
+    ! ================
+    call interp1(y(1:ny)/deltas_in,Qr_g,ny,yd,Qr,ndata,'linear')
+    call interp1(y(1:ny)/deltas_in,Qi_g,ny,yd,Qi,ndata,'linear')
+
+    ! modify data that are too far from the wall
+    do j=1,ngy
+       if (y(j)/deltas_in.ge.limy) Qr_g(j)=0.0_wp
+       if (y(j)/deltas_in.ge.limy) Qi_g(j)=0.0_wp
+    enddo
+
+    ! Derivative of eigenfunction with respect to y (second order)
+    ! =============================================
+    ! real part
+    dQr_g(1)=(Qr_g(2)-Qr_g(1))/(y(2)-y(1))
+    do j=2,ny-1
+       dQr_g(j)=(Qr_g(j+1)-Qr_g(j-1))/(y(j+1)-y(j-1))
+    enddo
+    dQr_g(ny)=0.0_wp
+    ! imaginary part
+    dQi_g(1)=(Qi_g(2)-Qi_g(1))/(y(2)-y(1))
+    do j=2,ny-1
+       dQi_g(j)=(Qi_g(j+1)-Qi_g(j-1))/(y(j+1)-y(j-1))
+    enddo
+    dQi_g(ny)=0.0_wp
+    
+  end subroutine read_eigenfunction
+
+  !===============================================================================
+  subroutine eig_disturb1(i,j,k,um,vm,wm,rm,tm)
+  !===============================================================================
+    !> Compute eigenmode disturbances (for bc_supersonic_inlet)
+  !===============================================================================
+    use mod_time ! for: time,deltat,ck
+    implicit none
+    ! ----------------------------------------------------------------------------
+    integer, intent(in) :: i,j,k ! grid point coord.
+    real(wp), intent(out) :: um,vm,wm,rm,tm ! disturbances
+    ! ----------------------------------------------------------------------------
+    ! local var
+    integer :: nm ! mode number 
+    real(wp) :: trk,phi,ampl ! time,phase,amplitude
+    ! ----------------------------------------------------------------------------
+    
+    ! time at RK stage
+    ! ================
+    trk =time+ck(irk)*deltat
+    
+    ! initialize derivatives of disturbances
+    ! ======================================
+    um=0.0_wp
+    vm=0.0_wp
+    wm=0.0_wp
+    rm=0.0_wp
+    tm=0.0_wp
+    
+    ! compute for all eigenmodes at point (i,j,k)
+    ! ===========================================
+    do nm=1,n_eig
+
+       ! argument and amplitude
+       ! ----------------------
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       ! distub for velocity u
+       ! ---------------------
+       um = um + ampl*(eig(nm)%ur(j)*cos(phi)-eig(nm)%ui(j)*sin(phi))
+
+       ! distub for velocity v
+       ! ---------------------
+       vm = vm + ampl*(eig(nm)%vr(j)*cos(phi)-eig(nm)%vi(j)*sin(phi))
+
+       ! distub for velocity w
+       ! ---------------------
+       wm = wm + ampl*(eig(nm)%wr(j)*cos(phi)-eig(nm)%wi(j)*sin(phi))
+
+       ! distub for density rho
+       ! ----------------------
+       rm = rm + ampl*(eig(nm)%rr(j)*cos(phi)-eig(nm)%ri(j)*sin(phi))
+
+       ! distub for temperature T 
+       ! ------------------------
+       tm = tm + ampl*(eig(nm)%tr(j)*cos(phi)-eig(nm)%ti(j)*sin(phi))
+    enddo
+
+  end subroutine eig_disturb1
+             
+  !===============================================================================
+  subroutine eig_disturb1_dt(i,j,k,dumt,dvmt,dwmt,drmt,dpmt)
+  !===============================================================================
+    !> Compute time derivative of eigenmode disturbances (for bc_supersonic_inlet)
+  !===============================================================================
+    use mod_time ! for: time,deltat,ck
+    implicit none
+    ! ----------------------------------------------------------------------------
+    integer, intent(in) :: i,j,k ! grid point coord.
+    real(wp), intent(out) :: dumt,dvmt,dwmt,drmt,dpmt ! time derivatives of disturbances
+    ! ----------------------------------------------------------------------------
+    ! local var
+    integer :: nm ! mode number 
+    real(wp) :: trk,phi,ampl ! time,phase,amplitude
+    ! ----------------------------------------------------------------------------
+    
+    ! time at RK stage
+    ! ================
+    trk =time+ck(irk)*deltat
+
+    ! initialize derivatives of disturbances
+    ! ======================================
+    dumt=0.0_wp
+    dvmt=0.0_wp
+    dwmt=0.0_wp
+    drmt=0.0_wp
+    dpmt=0.0_wp
+    
+    ! compute for all eigenmodes at point (i,j,k)
+    ! ===========================================
+    do nm=1,n_eig
+
+       ! argument and amplitude
+       ! ----------------------
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=eig(nm)%om*exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       ! time derivative of distub for velocity u
+       ! ----------------------------------------
+       dumt = dumt + ampl*(eig(nm)%ur(j)*sin(phi)+eig(nm)%ui(j)*cos(phi))
+
+       ! time derivative of distub for velocity v
+       ! ----------------------------------------
+       dvmt = dvmt + ampl*(eig(nm)%vr(j)*sin(phi)+eig(nm)%vi(j)*cos(phi))
+
+       ! time derivative of distub for velocity w
+       ! ----------------------------------------
+       dwmt = dwmt + ampl*(eig(nm)%wr(j)*sin(phi)+eig(nm)%wi(j)*cos(phi))
+
+       ! time derivative of distub for density rho
+       ! -----------------------------------------
+       drmt = drmt + ampl*(eig(nm)%rr(j)*sin(phi)+eig(nm)%ri(j)*cos(phi))
+
+       ! time derivative of distub for pressure p
+       ! ----------------------------------------
+       dpmt = dpmt + ampl*(eig(nm)%pr(j)*sin(phi)+eig(nm)%pi(j)*cos(phi))
+    enddo
+
+  end subroutine eig_disturb1_dt
+             
+  !===============================================================================
+  subroutine eig_disturb2_imin(i,j,k,pt_in,ut_in,vt_in,wt_in,rt_in,dp_in,du_in,dv_in,dw_in,dr_in)
+  !===============================================================================
+    !> Impose eigenmode disturbances at inlet (imin Tam & Dong's BC)
+  !===============================================================================
+    use mod_time ! for: time,deltat,ck
+    implicit none
+    ! ----------------------------------------------------------------------------
+    integer, intent(in)   :: i,j,k
+    ! eigenmode disturbances
+    real(wp), intent(out) :: pt_in,ut_in,vt_in,wt_in,rt_in
+    real(wp), intent(out) :: dp_in,du_in,dv_in,dw_in,dr_in
+    ! ----------------------------------------------------------------------------
+    ! local var
+    integer :: nm
+    real(wp) :: trk,phi,ampl
+    real(wp) :: qm,dqmx,dqmy,dqmt
+    real(wp), dimension(:,:), pointer :: ir,cosphi,sinphi
+    ! ----------------------------------------------------------------------------
+    
+    ir=>BC_face(1,1)%ir
+    cosphi=>BC_face(1,1)%cosphi
+    sinphi=>BC_face(1,1)%sinphi
+
+    ! time at RK stage
+    ! ================
+    trk =time+ck(irk)*deltat
+
+    ! pressure
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%pr(j)*cos(phi)-           eig(nm)%pi(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%pr(j)*sin(phi)-eig(nm)%kr*eig(nm)%pi(j)*cos(phi))*ampl &
+            + (            eig(nm)%pr(j)*cos(phi)-           eig(nm)%pi(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%dpr(j)*cos(phi)-          eig(nm)%dpi(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%pr(j)*sin(phi)+eig(nm)%om*eig(nm)%pi(j)*cos(phi))*ampl + dqmt
+    enddo
+    dp_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    pt_in=dqmt
+    !dp_in=0.0_wp
+    !pt_in=0.0_wp
+    
+    ! velocity u
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%ur(j)*cos(phi)-           eig(nm)%ui(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%ur(j)*sin(phi)-eig(nm)%kr*eig(nm)%ui(j)*cos(phi))*ampl &
+            + (            eig(nm)%ur(j)*cos(phi)-           eig(nm)%ui(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%dur(j)*cos(phi)-          eig(nm)%dui(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%ur(j)*sin(phi)+eig(nm)%om*eig(nm)%ui(j)*cos(phi))*ampl + dqmt
+    enddo
+    du_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    ut_in=dqmt
+    
+    ! velocity v
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%vr(j)*cos(phi)-           eig(nm)%vi(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%vr(j)*sin(phi)-eig(nm)%kr*eig(nm)%vi(j)*cos(phi))*ampl &
+            + (            eig(nm)%vr(j)*cos(phi)-           eig(nm)%vi(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%dvr(j)*cos(phi)-          eig(nm)%dvi(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%vr(j)*sin(phi)+eig(nm)%om*eig(nm)%vi(j)*cos(phi))*ampl + dqmt
+    enddo
+    dv_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    vt_in=dqmt
+    
+    ! velocity w
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%wr(j)*cos(phi)-           eig(nm)%wi(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%wr(j)*sin(phi)-eig(nm)%kr*eig(nm)%wi(j)*cos(phi))*ampl &
+            + (            eig(nm)%wr(j)*cos(phi)-           eig(nm)%wi(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%dwr(j)*cos(phi)-          eig(nm)%dwi(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%wr(j)*sin(phi)+eig(nm)%om*eig(nm)%wi(j)*cos(phi))*ampl + dqmt
+    enddo
+    dw_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    wt_in=dqmt
+    !dw_in=0.
+    !wt_in=0.
+    
+    ! density
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%rr(j)*cos(phi)-           eig(nm)%ri(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%rr(j)*sin(phi)-eig(nm)%kr*eig(nm)%ri(j)*cos(phi))*ampl &
+            + (            eig(nm)%rr(j)*cos(phi)-           eig(nm)%ri(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%drr(j)*cos(phi)-          eig(nm)%dri(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%rr(j)*sin(phi)+eig(nm)%om*eig(nm)%ri(j)*cos(phi))*ampl + dqmt
+    enddo
+    dr_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    rt_in=dqmt
+    !dr_in=0.
+    !rt_in=0.
+
+  end subroutine eig_disturb2_imin
+             
+  !===============================================================================
+  subroutine eig_disturb2_imin_jmin(i,j,k,pt_in,ut_in,vt_in,wt_in,rt_in,dp_in,du_in,dv_in,dw_in,dr_in)
+  !===============================================================================
+    !> Impose eigenmode disturbances at inlet (bottom-left corner: imin_jmin)
+  !===============================================================================
+    use mod_time 
+    implicit none
+    ! ----------------------------------------------------------------------------
+    integer, intent(in)   :: i,j,k
+    ! eigenmode disturbances
+    real(wp), intent(out) :: pt_in,ut_in,vt_in,wt_in,rt_in
+    real(wp), intent(out) :: dp_in,du_in,dv_in,dw_in,dr_in
+    ! ----------------------------------------------------------------------------
+    ! local var
+    integer :: nm
+    real(wp) :: trk,phi,ampl
+    real(wp) :: qm,dqmx,dqmy,dqmt
+    real(wp), dimension(:,:), pointer :: ir,cosphi,sinphi
+    ! ----------------------------------------------------------------------------
+    
+    ir=>BC_edge(1,1,1)%ir
+    cosphi=>BC_edge(1,1,1)%cosphi
+    sinphi=>BC_edge(1,1,1)%sinphi
+
+    trk =time+ck(irk)*deltat
+
+    ! pressure
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%pr(j)*cos(phi)-           eig(nm)%pi(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%pr(j)*sin(phi)-eig(nm)%kr*eig(nm)%pi(j)*cos(phi))*ampl &
+            + (            eig(nm)%pr(j)*cos(phi)-           eig(nm)%pi(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%dpr(j)*cos(phi)-          eig(nm)%dpi(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%pr(j)*sin(phi)+eig(nm)%om*eig(nm)%pi(j)*cos(phi))*ampl + dqmt
+    enddo
+    dp_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    pt_in=dqmt
+    !dp_in=0.
+    !pt_in=0.
+    
+    ! velocity u
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%ur(j)*cos(phi)-           eig(nm)%ui(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%ur(j)*sin(phi)-eig(nm)%kr*eig(nm)%ui(j)*cos(phi))*ampl &
+            + (            eig(nm)%ur(j)*cos(phi)-           eig(nm)%ui(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%dur(j)*cos(phi)-          eig(nm)%dui(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%ur(j)*sin(phi)+eig(nm)%om*eig(nm)%ui(j)*cos(phi))*ampl + dqmt
+    enddo
+    du_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    ut_in=dqmt
+    
+    ! velocity v
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%vr(j)*cos(phi)-           eig(nm)%vi(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%vr(j)*sin(phi)-eig(nm)%kr*eig(nm)%vi(j)*cos(phi))*ampl &
+            + (            eig(nm)%vr(j)*cos(phi)-           eig(nm)%vi(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%dvr(j)*cos(phi)-          eig(nm)%dvi(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%vr(j)*sin(phi)+eig(nm)%om*eig(nm)%vi(j)*cos(phi))*ampl + dqmt
+    enddo
+    dv_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    vt_in=dqmt
+    
+    ! velocity w
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%wr(j)*cos(phi)-           eig(nm)%wi(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%wr(j)*sin(phi)-eig(nm)%kr*eig(nm)%wi(j)*cos(phi))*ampl &
+            + (            eig(nm)%wr(j)*cos(phi)-           eig(nm)%wi(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%dwr(j)*cos(phi)-          eig(nm)%dwi(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%wr(j)*sin(phi)+eig(nm)%om*eig(nm)%wi(j)*cos(phi))*ampl + dqmt
+    enddo
+    dw_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    wt_in=dqmt
+    !dw_in=0.
+    !wt_in=0.
+    
+    ! density
+    qm  =0.0_wp
+    dqmx=0.0_wp
+    dqmy=0.0_wp
+    dqmt=0.0_wp
+    do nm=1,n_eig   
+       phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+       ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+
+       qm   = (            eig(nm)%rr(j)*cos(phi)-           eig(nm)%ri(j)*sin(phi))*ampl + qm
+       dqmx = (-eig(nm)%kr*eig(nm)%rr(j)*sin(phi)-eig(nm)%kr*eig(nm)%ri(j)*cos(phi))*ampl &
+            + (            eig(nm)%rr(j)*cos(phi)-           eig(nm)%ri(j)*sin(phi))*(-eig(nm)%ki*ampl) + dqmx
+       dqmy = (           eig(nm)%drr(j)*cos(phi)-          eig(nm)%dri(j)*sin(phi))*ampl + dqmy
+       dqmt = ( eig(nm)%om*eig(nm)%rr(j)*sin(phi)+eig(nm)%om*eig(nm)%ri(j)*cos(phi))*ampl + dqmt
+    enddo
+    dr_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+    rt_in=dqmt
+    !dr_in=0.
+    !rt_in=0.
+
+  end subroutine eig_disturb2_imin_jmin
+             
+!!$  !===============================================================
+!!$  ! Compute eigenmode disturbances (for Tam & Dong)
+!!$  !===============================================================
+!!$  subroutine eig_disturb_imin
+!!$    use mod_time
+!!$    implicit none
+!!$    !---------------------------------------------------------------------------
+!!$    integer   :: i,j,k
+!!$    ! eigenmode disturbances
+!!$    real(wp) :: pt_in,ut_in,vt_in,wt_in,rt_in
+!!$    real(wp) :: dp_in,du_in,dv_in,dw_in,dr_in
+!!$    ! local var
+!!$    integer :: nm
+!!$    real(wp) :: trk,phi,ampl
+!!$    real(wp) :: qm,dqmx,dqmy,dqmt
+!!$    real(wp), dimension(:,:), pointer :: ir,cosphi,sinphi,vg
+!!$    !---------------------------------------------------------------------------
+!!$    
+!!$    ir=>BC_face(1,1)%ir
+!!$    cosphi=>BC_face(1,1)%cosphi
+!!$    sinphi=>BC_face(1,1)%sinphi
+!!$    vg=>BC_face(1,1)%vg
+!!$
+!!$    trk =time+ck(irk)*deltat
+!!$
+!!$    do i=1,5
+!!$       do j=ndy,nfy
+!!$          do k=1,nz
+!!$             ! pressure
+!!$             qm  =0.0_wp
+!!$             dqmx=0.0_wp
+!!$             dqmy=0.0_wp
+!!$             dqmt=0.0_wp
+!!$             do nm=1,n_eig   
+!!$                phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+!!$                ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+!!$
+!!$                qm   = ( eig(nm)%pr(j)*cos(phi)- eig(nm)%pi(j)*sin(phi))*ampl + qm
+!!$                dqmx =-( eig(nm)%pr(j)*sin(phi)+ eig(nm)%pi(j)*cos(phi))*eig(nm)%kr*ampl &
+!!$                      -( eig(nm)%pr(j)*cos(phi)- eig(nm)%pi(j)*sin(phi))*eig(nm)%ki*ampl + dqmx
+!!$                dqmy = (eig(nm)%dpr(j)*cos(phi)-eig(nm)%dpi(j)*sin(phi))*ampl + dqmy
+!!$                dqmt = ( eig(nm)%pr(j)*sin(phi)+ eig(nm)%pi(j)*cos(phi))*eig(nm)%om*ampl + dqmt
+!!$             enddo
+!!$             dp_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+!!$             pt_in=dqmt
+!!$
+!!$             ! velocity u
+!!$             qm  =0.0_wp
+!!$             dqmx=0.0_wp
+!!$             dqmy=0.0_wp
+!!$             dqmt=0.0_wp
+!!$             do nm=1,n_eig   
+!!$                phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+!!$                ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+!!$
+!!$                qm   = ( eig(nm)%ur(j)*cos(phi)- eig(nm)%ui(j)*sin(phi))*ampl + qm
+!!$                dqmx =-( eig(nm)%ur(j)*sin(phi)+ eig(nm)%ui(j)*cos(phi))*eig(nm)%kr*ampl &
+!!$                      -( eig(nm)%ur(j)*cos(phi)- eig(nm)%ui(j)*sin(phi))*eig(nm)%ki*ampl + dqmx
+!!$                dqmy = (eig(nm)%dur(j)*cos(phi)-eig(nm)%dui(j)*sin(phi))*ampl + dqmy
+!!$                dqmt = ( eig(nm)%ur(j)*sin(phi)+ eig(nm)%ui(j)*cos(phi))*eig(nm)%om*ampl + dqmt
+!!$             enddo
+!!$             du_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+!!$             ut_in=dqmt
+!!$
+!!$             ! velocity v
+!!$             qm  =0.0_wp
+!!$             dqmx=0.0_wp
+!!$             dqmy=0.0_wp
+!!$             dqmt=0.0_wp
+!!$             do nm=1,n_eig   
+!!$                phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+!!$                ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+!!$
+!!$                qm   = ( eig(nm)%vr(j)*cos(phi)- eig(nm)%vi(j)*sin(phi))*ampl + qm
+!!$                dqmx =-( eig(nm)%vr(j)*sin(phi)+ eig(nm)%vi(j)*cos(phi))*eig(nm)%kr*ampl &
+!!$                      -( eig(nm)%vr(j)*cos(phi)- eig(nm)%vi(j)*sin(phi))*eig(nm)%ki*ampl + dqmx
+!!$                dqmy = (eig(nm)%dvr(j)*cos(phi)-eig(nm)%dvi(j)*sin(phi))*ampl + dqmy
+!!$                dqmt = ( eig(nm)%vr(j)*sin(phi)+ eig(nm)%vi(j)*cos(phi))*eig(nm)%om*ampl + dqmt
+!!$             enddo
+!!$             dv_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+!!$             vt_in=dqmt
+!!$
+!!$             ! velocity w
+!!$             qm  =0.0_wp
+!!$             dqmx=0.0_wp
+!!$             dqmy=0.0_wp
+!!$             dqmt=0.0_wp
+!!$             do nm=1,n_eig   
+!!$                phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+!!$                ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+!!$
+!!$                qm   = ( eig(nm)%wr(j)*cos(phi)- eig(nm)%wi(j)*sin(phi))*ampl + qm
+!!$                dqmx =-( eig(nm)%wr(j)*sin(phi)+ eig(nm)%wi(j)*cos(phi))*eig(nm)%kr*ampl &
+!!$                      -( eig(nm)%wr(j)*cos(phi)- eig(nm)%wi(j)*sin(phi))*eig(nm)%ki*ampl + dqmx
+!!$                dqmy = (eig(nm)%dwr(j)*cos(phi)-eig(nm)%dwi(j)*sin(phi))*ampl + dqmy
+!!$                dqmt = ( eig(nm)%wr(j)*sin(phi)+ eig(nm)%wi(j)*cos(phi))*eig(nm)%om*ampl + dqmt
+!!$             enddo
+!!$             dw_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+!!$             wt_in=dqmt
+!!$
+!!$             ! density
+!!$             qm  =0.0_wp
+!!$             dqmx=0.0_wp
+!!$             dqmy=0.0_wp
+!!$             dqmt=0.0_wp
+!!$             do nm=1,n_eig   
+!!$                phi =eig(nm)%kr*(x(i)-x(1))-eig(nm)%om*trk+eig(nm)%beta*z(k)
+!!$                ampl=exp(-eig(nm)%ki*(x(i)-x(1)))
+!!$
+!!$                qm   = ( eig(nm)%rr(j)*cos(phi)- eig(nm)%ri(j)*sin(phi))*ampl + qm
+!!$                dqmx =-( eig(nm)%rr(j)*sin(phi)+ eig(nm)%ri(j)*cos(phi))*eig(nm)%kr*ampl &
+!!$                      -( eig(nm)%rr(j)*cos(phi)- eig(nm)%ri(j)*sin(phi))*eig(nm)%ki*ampl + dqmx
+!!$                dqmy = (eig(nm)%drr(j)*cos(phi)-eig(nm)%dri(j)*sin(phi))*ampl + dqmy
+!!$                dqmt = ( eig(nm)%rr(j)*sin(phi)+ eig(nm)%ri(j)*cos(phi))*eig(nm)%om*ampl + dqmt
+!!$             enddo
+!!$             dr_in=dqmx*cosphi(i,j)+dqmy*sinphi(i,j)+qm*ir(i,j)
+!!$             rt_in=dqmt
+!!$
+!!$!!             pt(i,j,k) = pt(i,j,k) - vg(i,j,k)*dp_in - pt_in
+!!$!!             ut(i,j,k) = ut(i,j,k) - vg(i,j,k)*du_in - ut_in
+!!$!!             vt(i,j,k) = vt(i,j,k) - vg(i,j,k)*dv_in - vt_in
+!!$!!             wt(i,j,k) = wt(i,j,k) - vg(i,j,k)*dw_in - wt_in
+!!$!!             rt(i,j,k) = rt(i,j,k) - vg(i,j,k)*dr_in - rt_in
+!!$          enddo
+!!$       enddo
+!!$    enddo
+!!$    
+!!$  end subroutine eig_disturb_imin
+             
+end module mod_eigenmode

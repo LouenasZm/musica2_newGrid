@@ -1,0 +1,5 @@
+#!/bin/bash
+#
+grep -n $1 Boundary/*.f90 Derivatives/*.f90 Fluid/*.f90 Initial_condition/*.f90 Mathematics/*.f90 Time/*.f90 Compute_flow/*.f90 RANS/Boundary/* RANS/Compute_turb/* RANS/Fluid/* RANS/Grid/* RANS/Initial_condition/* RANS/Num_dissipation/* RANS/Time/* File_IO/*.f90 Grid/*.f90 Interpolation/*.f90 Main/*.f90 Num_dissipation/*.f90 Parallel/*.f90 Preprocessing/*.f90 Postprocessing/*.f90 Utils/*.f90
+#
+#grep -n $1 Boundary/*.f90 Derivatives/*.f90 Fluid/*.f90 Initial_condition/*.f90 Linear_algebra/*.f90 Mathematics/*.f90 Postprocessing/*.f90 Time/*.f90 Compute_flow/*.f90 File_IO/*.f90 Grid/*.f90 Interpolation/*.f90 Main/*.f90 Num_dissipation/*.f90 Parallel/*.f90 Preprocessing/*.f90 Utils/*.f90
