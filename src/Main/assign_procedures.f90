@@ -469,15 +469,47 @@ subroutine assign_procedures
               endif
            else
               if (is_curv) then
-                 bc_wall_imin => bc_wall_imin_adiabatic_c
-                 bc_wall_imax => bc_wall_imax_adiabatic_c
-                 bc_wall_jmin => bc_wall_jmin_adiabatic_c
-                 bc_wall_jmax => bc_wall_jmax_adiabatic_c
+                if (is_slip(1,1)) then
+                    bc_wall_imin => bc_wall_imin_slip_c
+                else
+                    bc_wall_imin => bc_wall_imin_adiabatic_c
+                endif
+                if (is_slip(1,2)) then
+                    bc_wall_imax => bc_wall_imax_slip_c
+                else
+                    bc_wall_imax => bc_wall_imax_adiabatic_c
+                endif
+                if (is_slip(2,1)) then
+                    bc_wall_jmin => bc_wall_jmin_slip_c
+                else
+                    bc_wall_jmin => bc_wall_jmin_adiabatic_c
+                endif
+                if (is_slip(2,2)) then
+                    bc_wall_jmax => bc_wall_jmax_slip_c
+                else
+                    bc_wall_jmax => bc_wall_jmax_adiabatic_c
+                endif
               else
-                 bc_wall_imin => bc_wall_imin_adiabatic
-                 bc_wall_imax => bc_wall_imax_adiabatic
-                 bc_wall_jmin => bc_wall_jmin_adiabatic
-                 bc_wall_jmax => bc_wall_jmax_adiabatic
+                if (is_slip(1,1)) then
+                    bc_wall_imin => bc_wall_imin_slip
+                else
+                    bc_wall_imin => bc_wall_imin_adiabatic
+                endif
+                if (is_slip(1,2)) then
+                    bc_wall_imax => bc_wall_imax_slip
+                else
+                    bc_wall_imax => bc_wall_imax_adiabatic
+                endif
+                if (is_slip(2,1)) then
+                    bc_wall_jmin => bc_wall_jmin_slip
+                else
+                    bc_wall_jmin => bc_wall_jmin_adiabatic
+                endif
+                if (is_slip(2,2)) then
+                    bc_wall_jmax => bc_wall_jmax_slip
+                else
+                    bc_wall_jmax => bc_wall_jmax_adiabatic
+                endif
               endif
               bc_wall_kmin => bc_wall_kmin_adiabatic
               bc_wall_kmax => bc_wall_kmax_adiabatic
