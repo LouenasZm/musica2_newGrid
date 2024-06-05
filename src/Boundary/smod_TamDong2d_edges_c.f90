@@ -694,11 +694,6 @@ contains
        l=i-nxmngh
        do j=1,nghp3
           do k=1,nz
-!!$             rf(l,j,k)=rho_n(i,j,k)-BC_face(2,1)%U0(i,j,k,1)
-!!$             uf(l,j,k)=   uu(i,j,k)-BC_face(2,1)%U0(i,j,k,2)
-!!$             vf(l,j,k)=   vv(i,j,k)-BC_face(2,1)%U0(i,j,k,3)
-!!$             wf(l,j,k)=   ww(i,j,k)-BC_face(2,1)%U0(i,j,k,4)
-!!$             pf(l,j,k)=  prs(i,j,k)-BC_face(2,1)%U0(i,j,k,5)
              rf(l,j,k)=rho_n(i,j,k)-BC_face(1,2)%U0(l,j,k,1)
              uf(l,j,k)=   uu(i,j,k)-BC_face(1,2)%U0(l,j,k,2)
              vf(l,j,k)=   vv(i,j,k)-BC_face(1,2)%U0(l,j,k,3)
@@ -1055,38 +1050,48 @@ contains
     
     ! Compute fluctuations
     ! ====================
+    ! Compute fluctuations
+    ! ====================
     do i=nxmngh-2,nx
-       l=i-nxmngh
-       do j=nymngh-2,ny
-          m=j-nymngh
-          do k=1,nz
-             rf(l,m,k)=rho_n(i,j,k)-BC_face(2,2)%U0(i,m,k,1)
-             uf(l,m,k)=   uu(i,j,k)-BC_face(2,2)%U0(i,m,k,2)
-             vf(l,m,k)=   vv(i,j,k)-BC_face(2,2)%U0(i,m,k,3)
-             wf(l,m,k)=   ww(i,j,k)-BC_face(2,2)%U0(i,m,k,4)
-             pf(l,m,k)=  prs(i,j,k)-BC_face(2,2)%U0(i,m,k,5)
-          enddo
-       enddo
-    enddo
-    
-    ! Compute group velocity vg
-    ! =========================
-    ! vg=u0*cos(phi)+v0*sin(phi) + sqrt(c0^2-w0^2-(u0*sin(phi)+v0*cos(phi))^2)
-    do i=nxmnghp1,nx
-       l=i-nxmngh
-       do j=nymnghp1,ny
-          m=j-nymngh
-          do k=1,nz
-             ! vg(l,m,k)= BC_face(2,2)%U0(i,m,k,2)*cosphi(l,m)+BC_face(2,2)%U0(i,m,k,3)*sinphi(l,m) &
-             !      + sqrt(BC_face(2,2)%U0(i,m,k,6)-BC_face(2,2)%U0(i,m,k,4)**2 &
-             !      -(BC_face(2,2)%U0(i,m,k,2)*sinphi(l,m)-BC_face(2,2)%U0(i,m,k,3)*cosphi(l,m))**2)
-             ! Protection of value with abs() if supersonic at outlet
-             vg(l,m,k)= BC_face(2,2)%U0(i,m,k,2)*cosphi(l,m)+BC_face(2,2)%U0(i,m,k,3)*sinphi(l,m) &
-                  + sqrt(abs(BC_face(2,2)%U0(i,m,k,6)-BC_face(2,2)%U0(i,m,k,4)**2 &
-                  -(BC_face(2,2)%U0(i,m,k,2)*sinphi(l,m)-BC_face(2,2)%U0(i,m,k,3)*cosphi(l,m))**2))
-          enddo
-       enddo
-    enddo
+        l=i-nxmngh
+        do j=nymngh-2,ny
+           m=j-nymngh
+           do k=1,nz
+              ! rf(l,m,k)=rho_n(i,j,k)-BC_face(2,2)%U0(i,m,k,1)
+              ! uf(l,m,k)=   uu(i,j,k)-BC_face(2,2)%U0(i,m,k,2)
+              ! vf(l,m,k)=   vv(i,j,k)-BC_face(2,2)%U0(i,m,k,3)
+              ! wf(l,m,k)=   ww(i,j,k)-BC_face(2,2)%U0(i,m,k,4)
+              ! pf(l,m,k)=  prs(i,j,k)-BC_face(2,2)%U0(i,m,k,5)
+              rf(l,m,k)=rho_n(i,j,k)-BC_face(1,2)%U0(l,j,k,1)
+              uf(l,m,k)=   uu(i,j,k)-BC_face(1,2)%U0(l,j,k,2)
+              vf(l,m,k)=   vv(i,j,k)-BC_face(1,2)%U0(l,j,k,3)
+              wf(l,m,k)=   ww(i,j,k)-BC_face(1,2)%U0(l,j,k,4)
+              pf(l,m,k)=  prs(i,j,k)-BC_face(1,2)%U0(l,j,k,5)
+           enddo
+        enddo
+     enddo
+     ! Compute group velocity vg
+     ! =========================
+     ! vg=u0*cos(phi)+v0*sin(phi) + sqrt(c0^2-w0^2-(u0*sin(phi)+v0*cos(phi))^2)
+     do i=nxmnghp1,nx
+        l=i-nxmngh
+        do j=nymnghp1,ny
+           m=j-nymngh
+           do k=1,nz
+              ! vg(l,m,k)= BC_face(2,2)%U0(i,m,k,2)*cosphi(l,m)+BC_face(2,2)%U0(i,m,k,3)*sinphi(l,m) &
+              !      + sqrt(BC_face(2,2)%U0(i,m,k,6)-BC_face(2,2)%U0(i,m,k,4)**2 &
+              !      -(BC_face(2,2)%U0(i,m,k,2)*sinphi(l,m)-BC_face(2,2)%U0(i,m,k,3)*cosphi(l,m))**2)
+              ! ! Protection of value with abs() if supersonic at outlet
+              ! vg(l,m,k)= BC_face(2,2)%U0(i,m,k,2)*cosphi(l,m)+BC_face(2,2)%U0(i,m,k,3)*sinphi(l,m) &
+              !      + sqrt(abs(BC_face(2,2)%U0(i,m,k,6)-BC_face(2,2)%U0(i,m,k,4)**2 &
+              !      -(BC_face(2,2)%U0(i,m,k,2)*sinphi(l,m)-BC_face(2,2)%U0(i,m,k,3)*cosphi(l,m))**2))
+              ! imax
+              vg(l,m,k)= BC_face(1,2)%U0(l,j,k,2)*cosphi(l,m)+BC_face(1,2)%U0(l,j,k,3)*sinphi(l,m) &
+                   + sqrt(BC_face(1,2)%U0(l,j,k,6)-BC_face(1,2)%U0(l,j,k,4)**2 &
+                   -(BC_face(1,2)%U0(l,j,k,2)*sinphi(l,m)-BC_face(1,2)%U0(l,j,k,3)*cosphi(l,m))**2)
+           enddo
+        enddo
+     enddo
 
     ! Non-centered derivatives in x-direction
     ! =======================================
