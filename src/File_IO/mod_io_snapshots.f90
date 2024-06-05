@@ -234,7 +234,7 @@ contains
 
     ! Initialization of planes or volumes for stats output TO BE CHANGED
     ! ====================================================
-    if (STBL.or.CYL.or.SHIT.or.ACT.or.TURB.or.TE) then
+    if (STBL.or.CYL.or.SHIT.or.ACT.or.TURB.or.TE.or.T3C) then
        if (is_curv3) then
           if (TURB) then
              ! Turbine blade with rough wall [particular case]

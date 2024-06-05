@@ -109,7 +109,7 @@ subroutine solver
         if (CYL) call read_write_stats_xyz(READ)
         !if (CYL.or.TURB) call read_write_stats_xyz(READ)
      else
-        if (STBL.or.CYL.or.SHIT.or.ACT.or.TURB.or.LE.or.TE) call read_write_stats_xy(READ,nob(iproc))
+        if (STBL.or.CYL.or.SHIT.or.ACT.or.TURB.or.LE.or.TE.or.T3C) call read_write_stats_xy(READ,nob(iproc))
         if (CHAN) call read_write_stats_chan(READ)
      endif
 
@@ -343,7 +343,7 @@ subroutine solver
      freq_stats=ndeb
      if (iproc.eq.0) write(*,*) 'TOTAL ITERATIONS:', nmax
 
-  elseif (STBL.or.SRC.or.CAV.or.ACT.or.SHIT.or.LE.or.TE) then
+  elseif (STBL.or.SRC.or.CAV.or.ACT.or.SHIT.or.LE.or.TE.or.T3C) then
      if (iproc.eq.0) write(*,*) 'TOTAL ITERATIONS:', nmax
      if (iproc.eq.0) write(*,*) 'Iterations/Turn :', (xmax-xmin)/c_ref/deltat
      
@@ -463,7 +463,7 @@ subroutine solver
            if (CYL) call read_write_stats_xyz(WRITE)
            !if (CYL.or.TURB) call read_write_stats_xyz(WRITE)
         else
-           if (STBL.or.CYL.or.SHIT.or.ACT.or.TURB.or.LE.or.TE) call read_write_stats_xy(WRITE,nob(iproc))
+           if (STBL.or.CYL.or.SHIT.or.ACT.or.TURB.or.LE.or.TE.or.T3C) call read_write_stats_xy(WRITE,nob(iproc))
            if (CHAN) call read_write_stats_chan(WRITE)
         endif
         call calcfilestamp(tstar,filestamp)
@@ -568,7 +568,7 @@ subroutine solver
         if (CYL) call read_write_stats_xyz(WRITE)
         !if (CYL.or.TURB) call read_write_stats_xyz(WRITE)
      else
-        if (STBL.or.CYL.or.SHIT.or.ACT.or.LE.or.TURB.or.TE) call read_write_stats_xy(WRITE,nob(iproc))
+        if (STBL.or.CYL.or.SHIT.or.ACT.or.LE.or.TURB.or.TE.or.T3C) call read_write_stats_xy(WRITE,nob(iproc))
         if (CHAN) call read_write_stats_chan(WRITE)
      endif
      call calcfilestamp(tstar,filestamp)

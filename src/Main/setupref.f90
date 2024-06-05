@@ -265,7 +265,7 @@ subroutine setupref
       tscale = 1.0_wp/u_ref
       mu_ref = rho_ref*u_ref*1.0_wp/Re_ref
 
-   elseif (STBL) then
+   elseif (STBL .or. T3C) then
       ! Predefined case #5: boundary layers
       ! ===================================
       deltas_in = Re_inlet*mu_ref/(rho_ref*c_ref) !!! TO BE CHANGED (Re_inlet is Re_ref redundant)

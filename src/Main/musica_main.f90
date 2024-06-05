@@ -118,7 +118,7 @@ program MUSICAA
   
   ! Setup of reference quantities
   ! =============================
-  if (CHIT.or.CHAN.or.PHILL.or.STBL.or.CYL.or.SHIT.or.TURB.or.SRC.or.LE.or.TE) call setupref
+  if (CHIT.or.CHAN.or.PHILL.or.STBL.or.CYL.or.SHIT.or.TURB.or.SRC.or.LE.or.TE.or.T3C) call setupref
 
   ! MPI partitioning: intrablock communicator
   ! ================

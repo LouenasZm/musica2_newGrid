@@ -73,7 +73,7 @@ subroutine alloc_tab
         allocate(avg_s(1,ny,nstat))
         allocate(avg_t(1,ny,nstat))
         allocate(avg_tg(1,ngy,nstat))
-     elseif (STBL.or.SRC.or.LE) then
+     elseif (STBL.or.SRC.or.LE.or.T3C) then
         nstat=167
         allocate(avg_s(nx,ny,nstat))
         allocate(avg_t(nx,ny,nstat))

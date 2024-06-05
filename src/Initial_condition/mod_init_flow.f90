@@ -95,7 +95,36 @@ contains
         vv= Uc2*u_ref
         ww= Uc3*u_ref
      endif
+    if(T3C)then 
+        uu= Uc1*u_ref
+        vv= Uc2*u_ref
+        ww= Uc3*u_ref
 
+        ! Damp velocity near the wall
+          ! ===========================
+          ! (to avoid violation of non-penetrability condition)
+        !if (is_bc_wall(2,1)) then
+        !    do k=1,nz
+        !       do j=1,10
+        !          do i=1,nx
+        !             uu(i,j,k)=uu(i,j,k)/10.0_wp*dble(j-1)
+        !             vv(i,j,k)=vv(i,j,k)/10.0_wp*dble(j-1)
+        !          enddo
+        !       enddo
+        !    enddo
+        ! endif
+        ! if (is_bc_wall(2,2)) then
+        !    do k=1,nz
+        !       do j=ny-9,ny
+        !          do i=1,nx
+        !             uu(i,j,k)=uu(i,j,k)/10.0_wp*dble(ny-j)
+        !             vv(i,j,k)=vv(i,j,k)/10.0_wp*dble(ny-j)
+        !          enddo
+        !       enddo
+        !    enddo
+        ! endif
+
+    endif
     ! actuator case
     if (ACT) call init_vel_act
 
@@ -151,6 +180,7 @@ contains
     enddo
     
   end subroutine init_flow
+
 
   !===============================================================================
   subroutine init_thermo

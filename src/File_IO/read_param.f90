@@ -336,6 +336,8 @@ subroutine read_param(paramfile)
      LE = .true.
   elseif (flowtype.eq.12) then
      TE = .true.
+  elseif (flowtype.eq.13) then 
+     T3C = .true.
   elseif (flowtype.eq.0) then
      SRC = .true.
   endif

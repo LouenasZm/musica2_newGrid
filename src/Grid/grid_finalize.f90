@@ -249,7 +249,7 @@ subroutine grid_finalize
   endif
   
   if (is_curv) then
-     if ((.not.CYL).and.(.not.TURB).and.(.not.TE)) &
+     if ((.not.CYL).and.(.not.TURB).and.(.not.TE).and.(.not.T3C)) &
           deltay=abs(ygc(1,2)-ygc(1,1))
      if (is_swapij_bl(3).or.is_swapij_bl(4)) &
           ! deltay=abs(ygc(2,1)-ygc(1,1))  <~ Useful ?? What is it for ?

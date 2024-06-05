@@ -96,7 +96,7 @@ subroutine assign_procedures
      stats => stats_act
   elseif (SRC.or.CAV.or.PHILL) then
      stats => voidp
-  elseif (LE) then
+  elseif (LE.or.T3C) then
      stats => stats_stbl
   elseif (TE) then
      stats => stats_turb
