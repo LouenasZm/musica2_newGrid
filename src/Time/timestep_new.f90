@@ -310,9 +310,9 @@ subroutine timestep_new
   tf = timemax*tscale
   !print *,delta_min,deltat,tf,timemax,tscale!,tf/deltat
 
-  nmax=min(nmax,int(tf/deltat)+1)
+  !nmax=min(nmax,int(tf/deltat)+1)
 
-  if (int(dtstar*nmax).ge.10000) call mpistop("/!\ tstar by the end of the simulation will be greater than 9999, problem with timestamp.",0)
+  !if (int(dtstar*nmax).ge.10000) call mpistop("/!\ tstar by the end of the simulation will be greater than 9999, problem with timestamp.",0)
 
   if (mod(ntime,nprint).eq.0) then  !!!!!  FOR dtvar TO BE CHANGED
      if (iproc==0) then

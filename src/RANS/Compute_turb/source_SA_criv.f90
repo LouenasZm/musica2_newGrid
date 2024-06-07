@@ -54,22 +54,21 @@ subroutine source_SA_criv
            D_om = sqrt(2.0_wp*(D11**2+D22**2+D33**2 + &
                        2.0_wp*(D12**2+D13**2+D23**2))) - magn_om
 
-
            S = magn_om + 2.0_wp*min(0.0_wp,D_om)
 
-           ! Modified vorticity
-           Stil = nutil(i,j,k)*inv_kap2/lengthscale(i,j,k)**2*fnu2
-           Stil = S+Stil
-
            ! Model parameters
-           khi  = nutil(i,j,k)/nu
+           khi  = nutil_n(i,j,k)/nu
            fnu1 = khi**3/(khi**3+cnu13)
            fnu2 = 1.0_wp-khi/(1.0_wp+khi*fnu1)
+
+           ! Modified vorticity
+           Stil = nutil_n(i,j,k)*inv_kap2/lengthscale(i,j,k)**2*fnu2
+           Stil = S+Stil
 
            ! Crivellini et. al. modif pour nutil<0
            if (khi.ge.0.0_wp) then
               ! Model parameters evaluated only in this case
-              r = min(nutil(i,j,k)/Stil*inv_kap2/lengthscale(i,j,k)**2,10.0_wp)
+              r = min(nutil_n(i,j,k)/Stil*inv_kap2/lengthscale(i,j,k)**2,10.0_wp)
               if (r.le.0.0_wp) r = 10.0_wp
               g_sa = r + cw2*(r**6-r)
               cw36=cw3**6
@@ -77,19 +76,19 @@ subroutine source_SA_criv
               ksi_nu = nu*(1.0_wp+khi)
 
               ! Source term 1 -> Production (same as before, just prevents negative values)
-              St1 = cb1*nutil(i,j,k)**2/r*inv_kap2/lengthscale(i,j,k)**2
+              St1 = cb1*nutil_n(i,j,k)**2/r*inv_kap2/lengthscale(i,j,k)**2
 
               ! Source term 2 -> Dissipation
-              St2 = -cw1*fw*(nutil(i,j,k)/lengthscale(i,j,k))**2
+              St2 = -cw1*fw*(nutil_n(i,j,k)/lengthscale(i,j,k))**2
             else
               ksi_nu = nu*(1.0_wp+khi+0.5_wp*khi**2)
               g_n = 1.0_wp-10.0_wp**3*khi**2/(1.0_wp+khi**2)
 
               ! Source term 1 -> Production
-              St1 = cb1*S*nutil(i,j,k)*g_n
+              St1 = cb1*S*nutil_n(i,j,k)*g_n
 
               ! Source term 2 -> Dissipation
-              St2 = cw1*(nutil(i,j,k)/lengthscale(i,j,k))**2
+              St2 = cw1*(nutil_n(i,j,k)/lengthscale(i,j,k))**2
             endif
 
            if (St1.gt.large_St1) St1 = large_St1
