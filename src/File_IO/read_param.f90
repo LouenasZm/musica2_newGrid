@@ -539,22 +539,45 @@ subroutine read_param_RANS
   !> date: (To be written)
   !> Reading advanced setting for RANS
 !===============================================================================
+    use mod_constant
+    use mod_rans
   use warnstop
   implicit none
   ! ---------------------------------------------------------------------------
   logical :: iexist
   ! ---------------------------------------------------------------------------
 
-  call mpistop('Advanced RANS setting paramfile needs to be written', 0)
-
-  ! Read param_RANS.ini file
-  ! ========================
-  inquire(file="param_RANS.ini", exist=iexist)
+  ! Initializaiton of the options:
+  is_transition=.false.
+   ! Read param.ini file
+  ! ===================
+  inquire(file=trim("param_rans.ini"), exist=iexist)
   if (.not.iexist) then
-     call mpistop('Advanced RANS paramfile does not exist!', 0)
+     call mpistop('"param_rans.ini" does not exist!', 0)
   endif
 
-
+  open(30,file=trim("param_rans.ini"))
+  rewind(30)
+  read(30,*) !===============================================================================================
+  read(30,*) !===============================================================================================
+  read(30,*) ! MUSICA2 : Read advanced RANS settings in param_RANS.ini
+  read(30,*) !===============================================================================================
+  read(30,*) !===============================================================================================
+  read(30,*) ! 1)   Specify transition parameters
+  read(30,*) !      - Algebraic or transport model
+  read(30,*) !      - Inlet conditions
+  read(30,*) !===============================================================================================
+  read(30,*) !===============================================================================================
+  read(30,*) !              1) Transitional Modelling: 
+  read(30,*) !===============================================================================================
+  read(30,*) ! Is it transitional simulation or not, T:yes, F:no
+  read(30,*) is_transition
+  read(30,*) ! What model ( "ALG": algebraic model, "GRE": Gamma-Re_theta transport model )
+  read(30,*) model_transition
+  model_transition = trim(model_transition)
+  read(30,*) ! Inlet turbulent intensity:
+  read(30,*) tu_inlet
+  tu_inlet=tu_inlet/100.0_wp
 end subroutine read_param_RANS
 
 
