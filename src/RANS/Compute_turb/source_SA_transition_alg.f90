@@ -16,6 +16,7 @@ subroutine source_SA_transition_algebraic
   integer  :: i,j,k
   real(wp) :: nu,D11,D12,D13,D21,D22,D23,D31,D32,D33,D_om,ksi_nu,g_n
   real(wp) :: cw36,inv_6,cnu13,inv_kap2
+  real(wp), parameter :: TWO_THIRDS=2.0_wp/3.0_wp,large_St1=5.0E3_wp
   ! ---------------------------------------------------------------------------
 
   ! Model constants & parameters

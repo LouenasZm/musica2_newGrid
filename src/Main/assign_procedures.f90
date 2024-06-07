@@ -65,7 +65,7 @@ subroutine assign_procedures
        , update_varn_filter, update_varn_artvisc &
        , flux_euler_3pts_SA_c, flux_visc_3pts_SA_c, flux_euler_5pts_SA_c, flux_visc_5pts_SA_c &
        , flux_euler_3pts_SA_c3, flux_visc_3pts_SA_c3, flux_euler_5pts_SA_c3, flux_visc_5pts_SA_c3 &
-       , source_SA, source_SA_criv, init_SA, update_var_SA, update_varn_artvisc_SA
+       , source_SA, source_SA_criv, source_SA_transition_algebraic, init_SA, update_var_SA, update_varn_artvisc_SA
   ! ------------------------------------------------------------------------------
 
   ! Define cases
@@ -830,72 +830,77 @@ subroutine assign_procedures
   ! Spalart-Allmaras !
   !******************!
      if (model_RANS.eq.'SA') then
-
-        ! Initialise turbulent variable field
-        init_rans => init_SA
-
-        ! Define order of Euler and viscous fluxes and derivatives
-        if (is_curv3) then
-           if (stencil_RANS.eq.5) then
-              flux_euler_rans => flux_euler_5pts_SA_c3
-              grad_rans       => grad_scalar_5pts_c3
-              flux_visc_rans  => flux_visc_5pts_SA_c3
-           elseif (stencil_RANS.eq.3) then
-              flux_euler_rans => flux_euler_3pts_SA_c3
-              grad_rans      => grad_scalar_3pts_c3
-              flux_visc_rans => flux_visc_3pts_SA_c3
-           endif
+        if(is_transition .and. model_transition == "gamma_re_theta")then
+            call mpistop("SA-Gamma_Re_theta not available yet", 0)
         else
-           if (stencil_RANS.eq.5) then
-              flux_euler_rans => flux_euler_5pts_SA_c
-              grad_rans       => grad_scalar_5pts_c
-              flux_visc_rans  => flux_visc_5pts_SA_c
-           elseif (stencil_RANS.eq.3) then
-              flux_euler_rans => flux_euler_3pts_SA_c
-              grad_rans      => grad_scalar_3pts_c
-              flux_visc_rans => flux_visc_3pts_SA_c
+            ! Initialise turbulent variable field
+            init_rans => init_SA
+
+            ! Define order of Euler and viscous fluxes and derivatives
+            if (is_curv3) then
+               if (stencil_RANS.eq.5) then
+                  flux_euler_rans => flux_euler_5pts_SA_c3
+                  grad_rans       => grad_scalar_5pts_c3
+                  flux_visc_rans  => flux_visc_5pts_SA_c3
+               elseif (stencil_RANS.eq.3) then
+                  flux_euler_rans => flux_euler_3pts_SA_c3
+                  grad_rans      => grad_scalar_3pts_c3
+                  flux_visc_rans => flux_visc_3pts_SA_c3
+               endif
+            else
+               if (stencil_RANS.eq.5) then
+                  flux_euler_rans => flux_euler_5pts_SA_c
+                  grad_rans       => grad_scalar_5pts_c
+                  flux_visc_rans  => flux_visc_5pts_SA_c
+               elseif (stencil_RANS.eq.3) then
+                  flux_euler_rans => flux_euler_3pts_SA_c
+                  grad_rans      => grad_scalar_3pts_c
+                  flux_visc_rans => flux_visc_3pts_SA_c
+               endif
+            endif
+
+            ! Define source term expression
+            if(.not. is_transition)then ! Fully turbulent
+                source_rans => source_SA_criv
+            elseif(is_transition .and. model_transition == "algebraic")then ! Transitional with algebraic model, maybe redundant
+                source_rans => source_SA_transition_algebraic
+            endif
+
+            ! Define communication
+            if (is_2D) then
+               communication_grad_rans => communication_2d_grad_rans
+               communication_rans      => communic2d
+            else
+               communication_grad_rans => communication_3d_grad_rans
+               communication_rans      => communic3d
+            endif
+
+            ! Define wall boundary conditions
+            bc_wall_imin_rans => bc_wall_imin_SA
+            bc_wall_imax_rans => bc_wall_imax_SA
+            bc_wall_jmin_rans => bc_wall_jmin_SA
+            bc_wall_jmax_rans => bc_wall_jmax_SA
+            bc_wall_kmin_rans => bc_wall_kmin_SA
+            bc_wall_kmax_rans => bc_wall_kmax_SA
+
+           ! Define numerical dissipation: DNC
+           if (is_shock) then
+              num_dissip_rans => artvisc_o3_shock_SA
+              !num_dissip_rans => artvisc_rus_SA
+           else
+              num_dissip_rans => artvisc_o3_SA
+              !if (stencil_RANS.eq.3) num_dissip_rans => artvisc_rus_SA
            endif
+
+           ! Update conservaive variables
+           update_var_rans => update_var_SA
+
+           ! Updating procedure
+           ! ------------------
+           !if (.not.is_dissip_in_increments) then
+           !    update_varn_rans => update_varn_artvisc_SA
+           !endif
         endif
-
-        ! Define source term expression
-        !source_rans => source_SA
-        source_rans => source_SA_criv
-
-        ! Define communication
-        if (is_2D) then
-           communication_grad_rans => communication_2d_grad_rans
-           communication_rans      => communic2d
-        else
-           communication_grad_rans => communication_3d_grad_rans
-           communication_rans      => communic3d
-        endif
-
-        ! Define wall boundary conditions
-        bc_wall_imin_rans => bc_wall_imin_SA
-        bc_wall_imax_rans => bc_wall_imax_SA
-        bc_wall_jmin_rans => bc_wall_jmin_SA
-        bc_wall_jmax_rans => bc_wall_jmax_SA
-        bc_wall_kmin_rans => bc_wall_kmin_SA
-        bc_wall_kmax_rans => bc_wall_kmax_SA
-
-       ! Define numerical dissipation: DNC
-       if (is_shock) then
-          num_dissip_rans => artvisc_o3_shock_SA
-          !num_dissip_rans => artvisc_rus_SA
-       else
-          num_dissip_rans => artvisc_o3_SA
-          !if (stencil_RANS.eq.3) num_dissip_rans => artvisc_rus_SA
-       endif
-
-       ! Update conservaive variables
-       update_var_rans => update_var_SA
-
-       ! Updating procedure
-       ! ------------------
-       !if (.not.is_dissip_in_increments) then
-       !    update_varn_rans => update_varn_artvisc_SA
-       !endif
-
        ! Define turb model length scale
        ! ------------------------------
        if (.not.is_DES) then

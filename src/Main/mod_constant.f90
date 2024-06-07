@@ -167,8 +167,10 @@ module mod_constant
   character(len=10) :: turb_model
   ! Indicators for RANS
   logical :: is_RANS ! Activation of RANS
+  logical :: is_transition ! Activation of transitional models for RANS simulation
   logical :: is_RANS_adv ! advanced RANS settings
   character(len=10) :: model_RANS,simulation_RANS
+  character(len=30) :: model_transition
   integer :: ndeb_RANS
   logical :: is_slip_in
   ! Indicators for DES
