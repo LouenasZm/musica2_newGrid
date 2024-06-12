@@ -22,7 +22,7 @@ contains
     ! ---------------------------------------------------------------------------
 
     !!!! /!\ Temporary ??????
-    dissip_coeff=0.15_wp
+    dissip_coeff=0.6_wp
 
     ! Artificial viscosity coefficients (DNC-Jameson)
     ! =================================

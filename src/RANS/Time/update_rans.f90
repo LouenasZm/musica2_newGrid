@@ -65,16 +65,13 @@ subroutine update_varn_artvisc_SA
   real(wp) :: large_value,low_value
   ! ---------------------------------------------------------------------------
 
-  ! Update variable
+  ! Update variable with added dissipation
   ! =============== 
-  large_value=30000.0_wp
-  low_value  =1.0E-20
 
   if (is_dtlocal) then
      do k=1,nz
         do j=1,ny
            do i=1,nx
-!               uvar(i,j,k,2) = nutil_n(i,j,k)
               nutil_n(i,j,k) = nutil(i,j,k)-dt_local(i,j,k)*Knutil(i,j,k)
               if (nutil_n(i,j,k).lt.0.0_wp) nutil_n(i,j,k)=low_value
            enddo
@@ -84,12 +81,7 @@ subroutine update_varn_artvisc_SA
      do k=1,nz
         do j=1,ny
            do i=1,nx
-!               uvar(i,j,k,2) = nutil_n(i,j,k)
               nutil_n(i,j,k) = nutil(i,j,k)-deltat*Knutil(i,j,k)
-              if (nutil_n(i,j,k)/mu_ref.gt.large_value) then
-                 print*,nutil_n(i,j,k),'mut too high'
-                 nutil_n(i,j,k)=mu_ref*large_value
-              endif
               if (nutil_n(i,j,k).lt.0.0_wp) nutil_n(i,j,k)=low_value
            enddo
         enddo
@@ -97,6 +89,32 @@ subroutine update_varn_artvisc_SA
   endif
 
 end subroutine update_varn_artvisc_SA
+
+!===============================================================================
+subroutine update_varn_filter_SA
+!===============================================================================
+  !> Update conservative variables after application of numerical dissipation
+  !> * version to be used with filtering *
+!===============================================================================
+  use mod_flow         ! for: conservative variables
+  use mod_rans         ! for: conservative variables
+  implicit none
+  ! ----------------------------------------------------------------------------
+  integer  :: i,j,k
+  ! ----------------------------------------------------------------------------
+
+  ! Update variables
+  ! ================
+
+  do k=1,nz
+     do j=1,ny
+        do i=1,nx
+           nutil_n(i,j,k)  = nutil_n(i,j,k)  + Knutil(i,j,k)
+        enddo
+     enddo
+  enddo
+
+end subroutine update_varn_filter_SA
 
 !===============================================================
 ! Update conservative variables to have dwi before application
