@@ -10,3 +10,4 @@ src_AB/*
 .mod/*
 cases/*
 .tmp.mod/*
+.vscode/
