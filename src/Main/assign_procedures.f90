@@ -52,6 +52,8 @@ subroutine assign_procedures
   use mod_bc_wall_rans
   use mod_artvisc_rans
   use mod_artvisc_shock_rans
+  use mod_filtering_rans
+  use mod_filtering_shock_rans
   use warnstop
   use mod_turb_model_length_scale
   use mod_wall_model
@@ -65,7 +67,7 @@ subroutine assign_procedures
        , update_varn_filter, update_varn_artvisc &
        , flux_euler_3pts_SA_c, flux_visc_3pts_SA_c, flux_euler_5pts_SA_c, flux_visc_5pts_SA_c &
        , flux_euler_3pts_SA_c3, flux_visc_3pts_SA_c3, flux_euler_5pts_SA_c3, flux_visc_5pts_SA_c3 &
-       , source_SA, source_SA_criv, source_SA_transition_algebraic, init_SA, update_var_SA, update_varn_artvisc_SA
+       , source_SA, source_SA_criv, source_SA_transition_algebraic, init_SA, init_SA_transition_algebraic ,update_var_SA, update_varn_artvisc_SA, update_varn_filter_SA
   ! ------------------------------------------------------------------------------
 
   ! Define cases
@@ -834,7 +836,11 @@ subroutine assign_procedures
             call mpistop("SA-Gamma_Re_theta not available yet", 0)
         else
             ! Initialise turbulent variable field
-            init_rans => init_SA
+            if(.not. is_transition)then ! Fully turbulent
+                init_rans => init_SA
+            elseif(is_transition .and. model_transition == "ALG")then ! Transitional with algebraic model, maybe redundant
+                init_rans => init_SA_transition_algebraic
+            endif
 
             ! Define order of Euler and viscous fluxes and derivatives
             if (is_curv3) then
@@ -862,7 +868,7 @@ subroutine assign_procedures
             ! Define source term expression
             if(.not. is_transition)then ! Fully turbulent
                 source_rans => source_SA_criv
-            elseif(is_transition .and. model_transition == "algebraic")then ! Transitional with algebraic model, maybe redundant
+            elseif(is_transition .and. model_transition == "ALG")then ! Transitional with algebraic model, maybe redundant
                 source_rans => source_SA_transition_algebraic
             endif
 
@@ -883,23 +889,41 @@ subroutine assign_procedures
             bc_wall_kmin_rans => bc_wall_kmin_SA
             bc_wall_kmax_rans => bc_wall_kmax_SA
 
-           ! Define numerical dissipation: DNC
+           ! Define numerical dissipation
+        ! ----------------------------
+        ! Selective filtering
+        if (is_SF) then
+           if (is_shock) then
+              num_dissip_rans => filter_o4_shock_SA
+              if (stencil_RANS.eq.3) num_dissip_rans => filter_o2_shock_SA
+           else
+              num_dissip_rans => filtering_5pts_SA
+              if (stencil_RANS.eq.3) num_dissip_rans => filtering_3pts_SA
+           endif
+        else
+        ! Artificial viscosity DNC
            if (is_shock) then
               num_dissip_rans => artvisc_o3_shock_SA
-              !num_dissip_rans => artvisc_rus_SA
+              if (stencil_RANS.eq.3) num_dissip_rans => artvisc_rus_SA
            else
               num_dissip_rans => artvisc_o3_SA
-              !if (stencil_RANS.eq.3) num_dissip_rans => artvisc_rus_SA
+              if (stencil_RANS.eq.3) num_dissip_rans => artvisc_rus_SA
            endif
+        endif
 
-           ! Update conservaive variables
-           update_var_rans => update_var_SA
+        ! Updating procedure
+        ! ------------------
+        ! Temporal update
+        update_var_rans => update_var_SA
+        ! Dissipation update
+        if (.not.is_dissip_in_increments) then
+           if (is_SF) then
+              update_varn_rans => update_varn_filter_SA
+           else
+              update_varn_rans => update_varn_artvisc_SA
+           endif
+        endif
 
-           ! Updating procedure
-           ! ------------------
-           !if (.not.is_dissip_in_increments) then
-           !    update_varn_rans => update_varn_artvisc_SA
-           !endif
         endif
        ! Define turb model length scale
        ! ------------------------------

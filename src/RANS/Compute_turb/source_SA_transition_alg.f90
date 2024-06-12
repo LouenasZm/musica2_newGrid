@@ -24,7 +24,7 @@ subroutine source_SA_transition_algebraic
   sig       = TWO_THIRDS
   kap       = 0.41_wp
   ksi1      = 0.002_wp 
-  ksi2      = 50.0_wp 
+  ksi2      = 0.02_wp 
   cb1       = 0.1355_wp
   cb2       = 0.622_wp
   cnu1      = 7.1_wp
@@ -64,11 +64,11 @@ subroutine source_SA_transition_algebraic
            ! Transitional onset: 
            re_vort  = lengthscale(i,j,k)**2*magn_om/nu 
            re_theta = re_vort/2.193_wp 
-           re_crit  = 803.73_wp *( Tu_inlet + 0.6067_wp )**(-1.027_wp)
-           term1    = max( re_theta - re_crit, 0.0_wp )/(ksi1*re_crit)
-           term2    = max( nut(i,j,k)/(ksi2*nu) , 0.0_wp)
-           gamma_cb = 1.0_wp - exp( -sqrt(term1) -sqrt(term2) )
-           if(gamma_cb .lt. 0.0_wp) gamma_cb = 0.0_wp 
+           re_crit  = 803.73_wp *( tu_inlet + 0.6067_wp )**(-1.027_wp)          !
+           term1    = max( re_theta - re_crit, 0.0_wp )/(ksi1*re_crit)          !
+           term2    = max( nut(i,j,k)/(ksi2*nu) , 0.0_wp)                       !
+           gamma_cb = 1.0_wp - exp( -sqrt(term1) -sqrt(term2) )                 !
+           if(gamma_cb .lt. 0.0_wp) gamma_cb = 0.0_wp                           !
         
            ! Model parameters
            khi  = nutil_n(i,j,k)/nu
@@ -81,16 +81,16 @@ subroutine source_SA_transition_algebraic
            ! Crivellini et. al. modif pour nutil<0
            if (khi.ge.0.0_wp) then
               ! Model parameters evaluated only in this case
-              r = min(nutil_n(i,j,k)/Stil*inv_kap2/lengthscale(i,j,k)**2,10.0_wp)
-              if (r.le.0.0_wp) r = 10.0_wp
-              cw2_lre   = cw4 + cw5/(khi)
+              r = min(nutil_n(i,j,k)/Stil*inv_kap2/lengthscale(i,j,k)**2, 1000.0_wp)
+              if (r.le.0.0_wp) r = 1000.0_wp
+              cw2_lre   = cw4 + cw5/(khi/40.0_wp + 1.0_wp)**2
               g_sa      = r + cw2_lre*(r**6-r)
               cw36      = cw3**6
               fw        = g_sa*((1.0_wp+cw36)/(g_sa**6+cw36))**inv_6
               ksi_nu    = nu*(1.0_wp+khi)
 
               ! Source term 1 -> Production (same as before, just prevents negative values)
-              St1 = cb1*nutil_n(i,j,k)**2/r*inv_kap2/lengthscale(i,j,k)**2
+              St1 = gamma_cb*cb1*nutil_n(i,j,k)**2/r*inv_kap2/lengthscale(i,j,k)**2
 
               ! Source term 2 -> Dissipation
               St2 = -cw1*fw*(nutil_n(i,j,k)/lengthscale(i,j,k))**2
