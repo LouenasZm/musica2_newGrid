@@ -224,6 +224,42 @@ subroutine alloc_tab
         allocate( Knutil(nx1:nx2,ny1:ny2,nz1:nz2))
         allocate(  Sterm(nx1:nx2,ny1:ny2,nz1:nz2))
         allocate(lengthscale(nx,ny,nz))
+
+        if(is_transition .and. model_transition == "GRE")then 
+            ! Fields for gamma-Re_theta:
+            ! *** First gamma
+            allocate(intermittency(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(intermittency_eff(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(    rho_gamma(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(   rhogamma_n(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(      dgammax(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(      dgammay(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(      dgammaz(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(  drho_gammax(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(  drho_gammay(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(  drho_gammaz(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(       Fgamma(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(       Ggamma(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(       Hgamma(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(       Kgamma(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(       Sgamma(nx1:nx2,ny1:ny2,nz1:nz2))
+            ! *** Then Re_theta
+            allocate(reynolds_theta(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(   rhore_theta(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate( rhore_theta_n(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(    dre_thetax(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(    dre_thetay(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(    dre_thetaz(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate( drhore_thetax(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate( drhore_thetay(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate( drhore_thetaz(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(     Fre_theta(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(     Gre_theta(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(     Hre_theta(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(     Kre_theta(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(        Stheta(nx1:nx2,ny1:ny2,nz1:nz2))
+        endif
+        
      endif
   endif
 

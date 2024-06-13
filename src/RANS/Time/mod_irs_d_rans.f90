@@ -8,6 +8,7 @@ module mod_irs_d_rans
 !=================================================================================
   use mod_constant ! <- for is_wall2
   use mod_rans
+  use mod_interface
   implicit none
   ! ------------------------------------------------------------------------------
   ! ------------------------------------------------------------------------------
@@ -76,7 +77,7 @@ contains
   end subroutine irs4_ngh_d_rans
 
   !===============================================================================
-  subroutine irs2_ngh_i_rans
+  subroutine irs2_ngh_i_sa
   !===============================================================================
     !> 2nd-order Implicit Residual Smoothing (IRS2) - Implicitation of i-direction
     !> Parallel inversion of tridiagonal matrix using ghost points
@@ -322,10 +323,10 @@ contains
 
     enddo
 
-  end subroutine irs2_ngh_i_rans
+  end subroutine irs2_ngh_i_sa
   
   !===============================================================================
-  subroutine irs2_ngh_j_rans
+  subroutine irs2_ngh_j_sa
   !===============================================================================
     !> 2nd-order Implicit Residual Smoothing (IRS2) - Implicitation of j-direction
     !> Parallel inversion of tridiagonal matrix using ghost points
@@ -580,10 +581,10 @@ contains
        
     enddo
 
-  end subroutine irs2_ngh_j_rans
+  end subroutine irs2_ngh_j_sa
   
   !===============================================================================
-  subroutine irs2_ngh_k_rans
+  subroutine irs2_ngh_k_sa
   !===============================================================================
     !> 2nd-order Implicit Residual Smoothing (IRS2) - Implicitation of k-direction
     !> Parallel inversion of tridiagonal matrix using ghost points
@@ -755,10 +756,10 @@ contains
        
     enddo
 
-  end subroutine irs2_ngh_k_rans
+  end subroutine irs2_ngh_k_sa
   
   !===============================================================================
-  subroutine irs4_ngh_i_rans
+  subroutine irs4_ngh_i_sa
   !===============================================================================
     !> 4th-order Implicit Residual Smoothing (IRS4) - Implicitation of i-direction
     !> Parallel inversion of pentadiagonal matrix using ghost points
@@ -1091,10 +1092,10 @@ contains
        
     enddo
 
-  end subroutine irs4_ngh_i_rans
+  end subroutine irs4_ngh_i_sa
   
   !===============================================================================
-  subroutine irs4_ngh_j_rans
+  subroutine irs4_ngh_j_sa
   !===============================================================================
     !> 4th-order Implicit Residual Smoothing (IRS4) - Implicitation of j-direction
     !> Parallel inversion of pentadiagonal matrix using ghost points
@@ -1410,10 +1411,10 @@ contains
        
     enddo
 
-  end subroutine irs4_ngh_j_rans
+  end subroutine irs4_ngh_j_sa
   
   !===============================================================================
-  subroutine irs4_ngh_k_rans
+  subroutine irs4_ngh_k_sa
   !===============================================================================
     !> 4th-order Implicit Residual Smoothing (IRS4) - Implicitation of k-direction
     !> Parallel inversion of pentadiagonal matrix using ghost points
@@ -1635,6 +1636,6 @@ contains
        
     enddo
 
-  end subroutine irs4_ngh_k_rans
+  end subroutine irs4_ngh_k_sa
   
 end module mod_irs_d_rans

@@ -190,4 +190,229 @@ contains
   
   end subroutine bc_wall_kmax_SA
 
+    !*******************!
+    ! Sa-Gamma-Re_theta !
+    !*******************!
+
+  !==============================================================================
+  subroutine bc_wall_imin_SA_transition
+    !==============================================================================
+      !> Apply wall Boundary Conditions at imin:
+    !==============================================================================
+    implicit none
+    ! ---------------------------------------------------------------------------
+    integer :: j,k
+      ! ---------------------------------------------------------------------------
+  
+      ! Update wall points
+      ! ==================
+        do k=1,nz
+           do j=1,ny
+              ! No turb content at wall
+              nutil(1,j,k) = 0.0_wp
+              nutil_n(1,j,k) = 0.0_wp
+              ! No normal fluxes for gamma at the wall:
+              drho_gammay(1,j,k)    = 0.0_wp 
+              ! No fluxes at the wall for Re_theta:
+              drhore_thetax(1,j,k)  = 0.0_wp 
+              drhore_thetay(1,j,k)  = 0.0_wp 
+              drhore_thetaz(1,j,k)  = 0.0_wp 
+           enddo
+        enddo
+    end subroutine bc_wall_imin_SA_transition
+  
+    !==============================================================================
+    subroutine bc_wall_imax_SA_transition
+    !==============================================================================
+      !> Apply wall Boundary Conditions at imax:
+    !==============================================================================
+      implicit none
+      ! ---------------------------------------------------------------------------
+      integer :: j,k
+      ! ---------------------------------------------------------------------------
+  
+      ! Update wall points
+      ! ==================
+
+      do k=1,nz
+         do j=1,ny
+            ! No turb content at wall
+            nutil(nx,j,k) = 0.0_wp
+            nutil_n(nx,j,k) = 0.0_wp
+            ! No normal fluxes for gamma at the wall:
+            drho_gammay(nx,j,k)    = 0.0_wp 
+              ! No fluxes at the wall for Re_theta:
+            drhore_thetax(nx,j,k)  = 0.0_wp 
+            drhore_thetay(nx,j,k)  = 0.0_wp 
+            drhore_thetaz(nx,j,k)  = 0.0_wp 
+         enddo
+      enddo
+  
+    end subroutine bc_wall_imax_SA_transition
+  
+    !==============================================================================
+    subroutine bc_wall_jmin_SA_transition
+    !==============================================================================
+      !> Apply wall Boundary Conditions at jmin:
+    !==============================================================================
+      use mod_constant ! for is_slip_in
+      use mod_mpi      ! for iproc
+      implicit none
+      ! ---------------------------------------------------------------------------
+      integer :: i,j,k
+      ! ---------------------------------------------------------------------------
+      ! Update wall points
+      ! ==================
+      if ((nob(iproc).eq.1).and.is_slip_in) then ! apply slip wall BC
+         do k=1,nz
+            do i=1,nx
+               nutil(i,1,k) = nutil(i,2,k)
+               nutil_n(i,1,k) = nutil_n(i,2,k)
+               rhogamma_n(i,1,k)     = rhogamma_n(i,2,k)
+            enddo
+         enddo
+      else
+         do k=1,nz
+            do i=1,nx
+                ! No turb content at wall
+                nutil(i,1,k) = 0.0_wp
+                nutil_n(i,1,k) = 0.0_wp
+                ! No normal fluxes for gamma at the wall:
+                drho_gammay(i,1,k)    = 0.0_wp 
+              ! No fluxes at the wall for Re_theta:
+                drhore_thetax(i,1,k)  = 0.0_wp 
+                drhore_thetay(i,1,k)  = 0.0_wp 
+                drhore_thetaz(i,1,k)  = 0.0_wp  
+            enddo
+         enddo
+      endif
+  
+    end subroutine bc_wall_jmin_SA_transition
+   
+    !==============================================================================
+    subroutine bc_wall_jmax_SA_transition
+    !==============================================================================
+      !> Apply wall Boundary Conditions at jmax:
+    !==============================================================================
+      use mod_constant ! for is_slip_in
+      use mod_mpi      ! for iproc
+      implicit none
+      ! ---------------------------------------------------------------------------
+      integer :: i,k
+      ! ---------------------------------------------------------------------------
+  
+      ! Update wall points
+      ! ==================
+      if ((nob(iproc).eq.1).and.is_slip_in) then ! apply slip wall BC
+         do k=1,nz
+            do i=1,nx
+               nutil(i,ny,k) = nutil(i,ny-1,k)
+               nutil_n(i,ny,k) = nutil_n(i,ny-1,k)
+               rhogamma_n(i,ny,k)     = rhogamma_n(i,ny,k)
+               ! No normal fluxes for gamma at the wall:
+               drho_gammay(i,ny,k)    = 0.0_wp  
+            enddo
+         enddo
+      else
+         do k=1,nz
+            do i=1,nx
+                ! No turb content at wall
+                nutil(i,ny,k) = 0.0_wp
+                nutil_n(i,ny,k) = 0.0_wp
+                ! No normal fluxes for gamma at the wall:
+                drho_gammay(i,ny,k)    = 0.0_wp 
+              ! No fluxes at the wall for Re_theta:
+                drhore_thetax(i,ny,k)  = 0.0_wp 
+                drhore_thetay(i,ny,k)  = 0.0_wp 
+                drhore_thetaz(i,ny,k)  = 0.0_wp 
+            enddo
+         enddo
+      endif
+    
+    end subroutine bc_wall_jmax_SA_transition 
+  
+    !==============================================================================
+    subroutine bc_wall_kmin_SA_transition
+    !==============================================================================
+      !> Apply wall Boundary Conditions at kmin:
+    !==============================================================================
+      use mod_constant ! for is_slip_in
+      use mod_mpi      ! for iproc
+      implicit none
+      ! ---------------------------------------------------------------------------
+      integer :: i,j
+      ! ---------------------------------------------------------------------------
+  
+      ! Update wall points
+      ! ==================
+      if ((nob(iproc).eq.1).and.is_slip_in) then ! apply slip wall BC
+         do j=1,ny
+            do i=1,nx
+               nutil(i,j,1) = nutil(i,j,2)
+               nutil_n(i,j,1) = nutil_n(i,j,2)
+               rhogamma_n(i,j,1)     = rhogamma_n(i,j,2)
+                ! No normal fluxes for gamma at the wall:
+                drho_gammay(i,j,1)    = 0.0_wp   
+            enddo
+         enddo
+      else
+         do j=1,ny
+            do i=1,nx
+                ! No turb content at wall
+                nutil(i,j,1) = 0.0_wp
+                nutil_n(i,j,1) = 0.0_wp
+                !No normal fluxes for gamma at the wall:
+                drho_gammay(i,j,1)    = 0.0_wp 
+              ! No fluxes at the wall for Re_theta:
+                drhore_thetax(i,j,1)  = 0.0_wp 
+                drhore_thetay(i,j,1)  = 0.0_wp 
+                drhore_thetaz(i,j,1)  = 0.0_wp 
+            enddo
+         enddo
+      endif
+    
+    end subroutine bc_wall_kmin_SA_transition
+   
+    !==============================================================================
+    subroutine bc_wall_kmax_SA_transition
+    !==============================================================================
+      !> Apply wall Boundary Conditions at kmax:
+    !==============================================================================
+      use mod_constant ! for is_slip_in
+      use mod_mpi      ! for iproc
+      implicit none
+      ! ---------------------------------------------------------------------------
+      integer :: i,j
+      ! ---------------------------------------------------------------------------
+  
+      ! Update wall points
+      ! ==================
+      if ((nob(iproc).eq.1).and.is_slip_in) then ! apply slip wall BC
+         do j=1,ny
+            do i=1,nx
+               nutil(i,j,nz) = nutil(i,j,nz-1)
+               nutil_n(i,j,nz) = nutil_n(i,j,nz-1)
+               rhogamma_n(i,j,nz)     = rhogamma_n(i,j,nz-1)
+               !No normal fluxes for gamma at the wall:
+               drho_gammay(i,j,nz)    = 0.0_wp  
+            enddo
+         enddo
+      else
+         do j=1,ny
+            do i=1,nx
+               ! No turb content at wall
+               nutil(i,j,nz) = 0.0_wp
+               nutil_n(i,j,nz) = 0.0_wp
+               !No normal fluxes for gamma at the wall:
+               drho_gammay(i,j,nz)    = 0.0_wp 
+              ! No fluxes at the wall for Re_theta:
+               drhore_thetax(i,j,nz)  = 0.0_wp 
+               drhore_thetay(i,j,nz)  = 0.0_wp 
+               drhore_thetaz(i,j,nz)  = 0.0_wp
+            enddo
+         enddo
+      endif
+    
+    end subroutine bc_wall_kmax_SA_transition
+  
 end module mod_bc_wall_rans

@@ -49,7 +49,11 @@ subroutine assign_procedures
   !use mod_turb_inlet_outlet
   !use mod_riemann
   ! RANS modules
+  use mod_irs_d_rans
+  use mod_runge_kutta_rans
   use mod_bc_wall_rans
+  use mod_inlet_rans
+  use mod_neumann_rans
   use mod_artvisc_rans
   use mod_artvisc_shock_rans
   use mod_filtering_rans
@@ -65,9 +69,15 @@ subroutine assign_procedures
        , stats_tgv, stats_chit, stats_chan, stats_stbl, stats_cyl, stats_sphere, stats_shit, stats_act, stats_turb, stats_turb3 &
        , filtering_fluct_11pts, filtering_11pts_overlap &
        , update_varn_filter, update_varn_artvisc &
+       ! Spalart Allmaras procedures
        , flux_euler_3pts_SA_c, flux_visc_3pts_SA_c, flux_euler_5pts_SA_c, flux_visc_5pts_SA_c &
        , flux_euler_3pts_SA_c3, flux_visc_3pts_SA_c3, flux_euler_5pts_SA_c3, flux_visc_5pts_SA_c3 &
-       , source_SA, source_SA_criv, source_SA_transition_algebraic, init_SA, init_SA_transition_algebraic ,update_var_SA, update_varn_artvisc_SA, update_varn_filter_SA
+       , source_SA, source_SA_criv, source_SA_transition_algebraic, init_SA, init_SA_transition_algebraic ,update_var_SA, update_varn_artvisc_SA, update_varn_filter_SA &
+       ! SA-Gamma-Re_theta procedures
+       , flux_euler_3pts_SA_transition_c, flux_visc_3pts_SA_transition_c, flux_euler_5pts_SA_transition_c, flux_visc_5pts_SA_transition_c &
+       , flux_euler_3pts_SA_transition_c3, flux_visc_3pts_SA_transition_c3, flux_euler_5pts_SA_transition_c3, flux_visc_5pts_SA_transition_c3 &
+       , source_SA_transition, init_SA_transition, update_var_SA_transition, update_varn_artvisc_SA_transition
+
   ! ------------------------------------------------------------------------------
 
   ! Define cases
@@ -832,9 +842,85 @@ subroutine assign_procedures
   ! Spalart-Allmaras !
   !******************!
      if (model_RANS.eq.'SA') then
-        if(is_transition .and. model_transition == "gamma_re_theta")then
-            call mpistop("SA-Gamma_Re_theta not available yet", 0)
+        if(is_transition .and. model_transition == "GRE")then ! GRE: Gamma-Re_theta
+                        ! ======= Transition with the Gamma-Re_theta transport model
+            start_runge_kutta_rans => start_runge_kutta_SA_transition
+            runge_kutta_rans       => runge_kutta_SA_transition
+            ! Initialise turbulent variable field
+             init_rans => init_SA_transition
+    
+            ! Define order of Euler and viscous fluxes and derivatives
+            if (is_curv3) then
+                if (stencil_RANS.eq.5) then
+                   flux_euler_rans => flux_euler_5pts_SA_transition_c3
+                   grad_rans       => grad_scalar_5pts_c3
+                   flux_visc_rans  => flux_visc_5pts_SA_transition_c3
+                elseif (stencil_RANS.eq.3) then
+                   flux_euler_rans => flux_euler_3pts_SA_transition_c3
+                   grad_rans      => grad_scalar_3pts_c3
+                   flux_visc_rans => flux_visc_3pts_SA_transition_c3
+                endif
+            else
+               if (stencil_RANS.eq.5) then
+                  flux_euler_rans => flux_euler_5pts_SA_transition_c
+                  grad_rans       => grad_scalar_5pts_c
+                  flux_visc_rans  => flux_visc_5pts_SA_transition_c
+               elseif (stencil_RANS.eq.3) then
+                  flux_euler_rans => flux_euler_3pts_SA_transition_c
+                  grad_rans      => grad_scalar_3pts_c
+                  flux_visc_rans => flux_visc_3pts_SA_transition_c
+               endif
+            endif
+            ! Define source term expression
+            source_rans => source_SA_transition
+    
+            ! Define communication
+            if (is_2D) then
+               communication_grad_rans => communication_2d_grad_rans
+               communication_rans      => communic2d
+            else
+               communication_grad_rans => communication_3d_grad_rans
+               communication_rans      => communic3d
+            endif
+    
+            ! Define wall boundary conditions
+            bc_wall_imin_rans => bc_wall_imin_SA_transition
+            bc_wall_imax_rans => bc_wall_imax_SA_transition
+            bc_wall_jmin_rans => bc_wall_jmin_SA_transition
+            bc_wall_jmax_rans => bc_wall_jmax_SA_transition
+            bc_wall_kmin_rans => bc_wall_kmin_SA_transition
+            bc_wall_kmax_rans => bc_wall_kmax_SA_transition
+            
+            ! Define inlet boundary conditions
+            inlet_imin_rans => inlet_imin_SA_transition
+            inlet_imax_rans => inlet_imax_SA_transition
+            inlet_jmin_rans => inlet_jmin_SA_transition
+            inlet_jmax_rans => inlet_jmax_SA_transition
+            inlet_kmin_rans => inlet_kmin_SA_transition
+            inlet_kmax_rans => inlet_kmax_SA_transition
+    
+            ! Neumann boundary condition:
+            neu_imin_rans => neu_imin_SA_transition
+            neu_imax_rans => neu_imax_SA_transition
+            neu_jmin_rans => neu_jmin_SA_transition
+            neu_jmax_rans => neu_jmax_SA_transition
+            neu_kmin_rans => neu_kmin_SA_transition
+            neu_kmax_rans => neu_kmax_SA_transition
+            ! Define numerical dissipation: DNC, for now only applied to nutild, needs to be changed
+            if (is_shock) then
+               num_dissip_rans => artvisc_o3_shock_SA
+               !num_dissip_rans => artvisc_rus_SA_transition
+            else
+               num_dissip_rans => artvisc_o3_SA_transition
+               !if (stencil_RANS.eq.3) num_dissip_rans => artvisc_rus_SA_transition
+            endif
+    
+            ! Update conservaive variables
+            update_var_rans => update_var_SA_transition
         else
+            !========= Fully turbulent SA or transitional with algebraic model
+            start_runge_kutta_rans => start_runge_kutta_SA
+            runge_kutta_rans       => runge_kutta_SA
             ! Initialise turbulent variable field
             if(.not. is_transition)then ! Fully turbulent
                 init_rans => init_SA
@@ -864,7 +950,14 @@ subroutine assign_procedures
                   flux_visc_rans => flux_visc_3pts_SA_c
                endif
             endif
-
+            ! Define IRS procedures:
+            irs2_ngh_i_rans => irs2_ngh_i_SA
+            irs2_ngh_j_rans => irs2_ngh_j_SA
+            irs2_ngh_k_rans => irs2_ngh_k_SA
+            irs4_ngh_i_rans => irs4_ngh_i_SA
+            irs4_ngh_j_rans => irs4_ngh_j_SA
+            irs4_ngh_k_rans => irs4_ngh_k_SA
+            
             ! Define source term expression
             if(.not. is_transition)then ! Fully turbulent
                 source_rans => source_SA_criv
@@ -888,6 +981,22 @@ subroutine assign_procedures
             bc_wall_jmax_rans => bc_wall_jmax_SA
             bc_wall_kmin_rans => bc_wall_kmin_SA
             bc_wall_kmax_rans => bc_wall_kmax_SA
+
+            ! Define inlet boundary conditions
+            inlet_imin_rans => inlet_imin_sa
+            inlet_imax_rans => inlet_imax_sa
+            inlet_jmin_rans => inlet_jmin_sa
+            inlet_jmax_rans => inlet_jmax_sa
+            inlet_kmin_rans => inlet_kmin_sa
+            inlet_kmax_rans => inlet_kmax_sa
+    
+            ! Neumann boundary condition:
+            neu_imin_rans => neu_imin_sa
+            neu_imax_rans => neu_imax_sa
+            neu_jmin_rans => neu_jmin_sa
+            neu_jmax_rans => neu_jmax_sa
+            neu_kmin_rans => neu_kmin_sa
+            neu_kmax_rans => neu_kmax_sa
 
            ! Define numerical dissipation
         ! ----------------------------

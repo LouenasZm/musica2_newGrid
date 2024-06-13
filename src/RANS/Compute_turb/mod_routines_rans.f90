@@ -12,7 +12,7 @@ module mod_routines_rans
 contains
  
   !===============================================================
-  subroutine residuals_rans
+  subroutine residuals_sa
   !===============================================================
     !> Compute residuals (for conservative variables)
   !===============================================================
@@ -91,6 +91,6 @@ contains
     endif
 
 
-  end subroutine residuals_rans
+  end subroutine residuals_sa
 
 end module mod_routines_rans

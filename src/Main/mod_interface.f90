@@ -146,6 +146,8 @@ module mod_interface
                                  , num_dissip_rans => null() &
                                  , update_var_rans => null() & 
                                  , length_scale_rans => null() &
+                                 , start_runge_kutta_rans => null() &
+                                 , runge_kutta_rans => null() &
                                  ! wall BC RANS
                                  , bc_wall_imin_rans => null() &
                                  , bc_wall_imax_rans => null() &
@@ -153,12 +155,32 @@ module mod_interface
                                  , bc_wall_jmax_rans => null() &
                                  , bc_wall_kmin_rans => null() &
                                  , bc_wall_kmax_rans => null() &
+                                 ! Inlet RANS BC:
+                                 , inlet_imin_rans => null() &
+                                 , inlet_imax_rans => null() &
+                                 , inlet_jmin_rans => null() &
+                                 , inlet_jmax_rans => null() &
+                                 , inlet_kmin_rans => null() &
+                                 , inlet_kmax_rans => null() &
+                                 ! Neumann RANS BC:
+                                 , neu_imin_rans => null() &
+                                 , neu_imax_rans => null() &
+                                 , neu_jmin_rans => null() &
+                                 , neu_jmax_rans => null() &
+                                 , neu_kmin_rans => null() &
+                                 , neu_kmax_rans => null() &
                                  ! IRS RANS
                                  , irs_rans         => null() &
                                  , irs_solver_rans  => null() &
                                  , apply_irs_1_rans => null() &
                                  , apply_irs_2_rans => null() &
                                  , apply_irs_3_rans => null() &
+                                 , irs2_ngh_i_rans  => null() &
+                                 , irs2_ngh_j_rans  => null() &
+                                 , irs2_ngh_k_rans  => null() &
+                                 , irs4_ngh_i_rans  => null() &
+                                 , irs4_ngh_j_rans  => null() &
+                                 , irs4_ngh_k_rans  => null() &
                                  ! wall-model
                                  , bc_wm_jmin => null() &
                                  , bc_wm_jmax => null() &
