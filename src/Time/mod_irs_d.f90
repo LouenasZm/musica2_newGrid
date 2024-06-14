@@ -1035,7 +1035,7 @@ contains
           endif
        endif
     else ! for new wall conditions, set some increments to zero
-       if (is_bc_wall(1,1)) then
+       if ((is_bc_wall(1,1)).and.(.not.is_slip(1,1))) then
           do i2=i2min,i2max
              Krhou(1,i2,:)=0.0_wp
              Krhov(1,i2,:)=0.0_wp
@@ -1043,7 +1043,7 @@ contains
              Krhoe(1,i2,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(1,2)) then
+       if (is_bc_wall(1,2).and.(.not.is_slip(1,2))) then
           do i2=i2min,i2max
              Krhou(nx,i2,:)=0.0_wp
              Krhov(nx,i2,:)=0.0_wp
@@ -1051,7 +1051,7 @@ contains
              Krhoe(nx,i2,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(2,1)) then
+       if (is_bc_wall(2,1).and.(.not.is_slip(2,1))) then
           do i3=i3min,i3max
              Krhou(i3,1,:)=0.0_wp
              Krhov(i3,1,:)=0.0_wp
@@ -1059,7 +1059,7 @@ contains
              Krhoe(i3,1,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(2,2)) then
+       if (is_bc_wall(2,2).and.(.not.is_slip(2,2))) then
           do i3=i3min,i3max
              Krhou(i3,ny,:)=0.0_wp
              Krhov(i3,ny,:)=0.0_wp
@@ -1067,7 +1067,7 @@ contains
              Krhoe(i3,ny,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(3,1)) then
+       if (is_bc_wall(3,1).and.(.not.is_slip(3,1))) then
           do i3=i3min,i3max
              Krhou(i3,:,1)=0.0_wp
              Krhov(i3,:,1)=0.0_wp
@@ -1075,7 +1075,7 @@ contains
              Krhoe(i3,:,1)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(3,2)) then
+       if (is_bc_wall(3,2).and.(.not.is_slip(3,2))) then
           do i3=i3min,i3max
              Krhou(i3,:,nz)=0.0_wp
              Krhov(i3,:,nz)=0.0_wp
@@ -1500,7 +1500,7 @@ contains
           endif
        endif
     else ! for new wall conditions, set some increments to zero
-       if (is_bc_wall(1,1)) then
+       if (is_bc_wall(1,1).and.(.not.is_slip(1,1))) then
           do i3=i3min,i3max
              Krhou(1,i3,:)=0.0_wp
              Krhov(1,i3,:)=0.0_wp
@@ -1508,7 +1508,7 @@ contains
              Krhoe(1,i3,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(1,2)) then
+       if (is_bc_wall(1,2).and.(.not.is_slip(1,2))) then
           do i3=i3min,i3max
              Krhou(nx,i3,:)=0.0_wp
              Krhov(nx,i3,:)=0.0_wp
@@ -1516,7 +1516,7 @@ contains
              Krhoe(nx,i3,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(2,1)) then
+       if (is_bc_wall(2,1).and.(.not.is_slip(2,1))) then
           do i2=i2min,i2max
              Krhou(i2,1,:)=0.0_wp
              Krhov(i2,1,:)=0.0_wp
@@ -1524,7 +1524,7 @@ contains
              Krhoe(i2,1,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(2,2)) then
+       if (is_bc_wall(2,2).and.(.not.is_slip(2,2))) then
           do i2=i2min,i2max
              Krhou(i2,ny,:)=0.0_wp
              Krhov(i2,ny,:)=0.0_wp
@@ -1532,7 +1532,7 @@ contains
              Krhoe(i2,ny,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(3,1)) then
+       if (is_bc_wall(3,1).and.(.not.is_slip(3,1))) then
           do i2=i2min,i2max
              Krhou(i2,:,1)=0.0_wp
              Krhov(i2,:,1)=0.0_wp
@@ -1540,7 +1540,7 @@ contains
              Krhoe(i2,:,1)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(3,2)) then
+       if (is_bc_wall(3,2).and.(.not.is_slip(3,2))) then
           do i2=i2min,i2max
              Krhou(i2,:,nz)=0.0_wp
              Krhov(i2,:,nz)=0.0_wp
@@ -1910,7 +1910,7 @@ contains
           endif
        endif
     else ! for new wall conditions, set some increments to zero
-       if (is_bc_wall(1,1)) then
+       if (is_bc_wall(1,1).and.(.not.is_slip(1,1))) then
           do i1=i1min,i1max
              Krhou(1,i1,:)=0.0_wp
              Krhov(1,i1,:)=0.0_wp
@@ -1918,7 +1918,7 @@ contains
              Krhoe(1,i1,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(1,2)) then
+       if (is_bc_wall(1,2).and.(.not.is_slip(1,2))) then
           do i1=i1min,i1max
              Krhou(nx,i1,:)=0.0_wp
              Krhov(nx,i1,:)=0.0_wp
@@ -1926,7 +1926,7 @@ contains
              Krhoe(nx,i1,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(2,1)) then
+       if (is_bc_wall(2,1).and.(.not.is_slip(2,1))) then
           do i2=i2min,i2max
              Krhou(i2,1,:)=0.0_wp
              Krhov(i2,1,:)=0.0_wp
@@ -1934,7 +1934,7 @@ contains
              Krhoe(i2,1,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(2,2)) then
+       if (is_bc_wall(2,2).and.(.not.is_slip(2,2))) then
           do i2=i2min,i2max
              Krhou(i2,ny,:)=0.0_wp
              Krhov(i2,ny,:)=0.0_wp
@@ -1942,7 +1942,7 @@ contains
              Krhoe(i2,ny,:)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(3,1)) then
+       if (is_bc_wall(3,1).and.(.not.is_slip(3,1))) then
           do i2=i2min,i2max
              Krhou(i2,:,1)=0.0_wp
              Krhov(i2,:,1)=0.0_wp
@@ -1950,7 +1950,7 @@ contains
              Krhoe(i2,:,1)=0.0_wp
           enddo
        endif
-       if (is_bc_wall(3,2)) then
+       if (is_bc_wall(3,2).and.(.not.is_slip(3,2))) then
           do i2=i2min,i2max
              Krhou(i2,:,nz)=0.0_wp
              Krhov(i2,:,nz)=0.0_wp
