@@ -345,7 +345,7 @@ subroutine solver
 
   elseif (STBL.or.SRC.or.CAV.or.ACT.or.SHIT.or.LE.or.TE.or.T3C) then
      if (iproc.eq.0) write(*,*) 'TOTAL ITERATIONS:', nmax
-     if (iproc.eq.0) write(*,*) 'Iterations/Turn :', (xmax-xmin)/c_ref/deltat
+     if (iproc.eq.0) write(*,*) 'Iterations/Turn :', (xmax-xmin)/u_ref/deltat
      
   elseif ((CYL).or.(TURB)) then
      !call write_surf_norm
