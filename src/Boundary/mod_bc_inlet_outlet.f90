@@ -9,6 +9,7 @@ module mod_bc_inlet_outlet
   use mod_flow      ! for: flow variables
   use mod_eos       ! for: comp. thermodynamic quantities
   use mod_bc_rad_eq ! for: radial equilibirum approximation
+  use mod_coeff_deriv
   implicit none
   !------------------------------------------------------------------------------
   ! total (stagnation) quantities
@@ -779,7 +780,7 @@ contains
     ! Riemann invariant dp-(roc)_0 dU
     real(wp) :: am0,roc0,coeff
     ! quantities at boundary points
-    real(wp) :: rob,Tb,pb
+    real(wp) :: rob,Tb,pb, prs_RHS, Uin_RHS
     ! ---------------------------------------------------------------------------
     ! param for fluctuations
     real(wp), dimension(ny,nz) :: u_in,v_in,w_in
@@ -806,13 +807,23 @@ contains
           Uin=sign_imin*Uin
           
           ! product (roc)_0 (extrapolated from interior)
-          roc0=rho_n(2,j,k)*c_(2,j,k)
+          !roc0=rho_n(2,j,k)*c_(2,j,k)
+          ! 4 th order extrapolation
+          roc0=1.0_wp/a04(1)*( -(a04(2)*rho_n(2,j,k)*c_(2,j,k) + &
+                                 a04(3)*rho_n(3,j,k)*c_(3,j,k) + &
+                                 a04(4)*rho_n(4,j,k)*c_(4,j,k) + &
+                                 a04(5)*rho_n(5,j,k)*c_(5,j,k) ))
           !roc0=rho_n(1,j,k)*c_(1,j,k)
 
           ! compute outgoing characteristic from interior nodes
           ! dp-(roc)_0 dU=cste <=> pb-(roc)_0 Ubn=pi-(roc)_0 Uin=am0
-          am0= prs(2,j,k)-roc0*Uin
-
+        ! 4. 4th order off-centered
+          prs_RHS = -1.0_wp/a04(1)*( a04(2)*prs(2,j,k)+a04(3)*prs(3,j,k) + &
+                                     a04(4)*prs(4,j,k)+a04(5)*prs(5,j,k) )
+          Uin_RHS = -1.0_wp/a04(1)*( a04(2)* uu(2,j,k)+a04(3)* uu(3,j,k) + &
+                                     a04(4)* uu(4,j,k)+a04(5)* uu(5,j,k) )*sign_imin
+          !am0= prs(2,j,k)-roc0*Uin
+          am0= prs_RHS - roc0*Uin_RHS
           ! coefficient taken flow direction into account
           coeff=(cdir_imin(j,k)/roc0)**2
 
