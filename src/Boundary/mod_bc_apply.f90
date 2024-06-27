@@ -180,26 +180,26 @@ contains
     ! ================
        !if (TURB) then
 
-    if (BC_face(1,1)%sort==-4) call bc_inlet_imin
+    if (BC_face(1,1)%sort==-4 .or. BC_face(1,1)%sort==-41) call bc_inlet_imin
     !if (BC_face(1,1)%sort==-4) call bc_inlet_prs_imin
     !if (BC_face(1,1)%sort==-4) call bc_inlet_test_imin
     !if (BC_face(1,1)%sort==-4) call bc_turb_inlet_imin
     if (BC_face(1,1)%sort==-5) call bc_outlet_imin
 
-    if (BC_face(1,2)%sort==-4) call bc_inlet_imax
+    if (BC_face(1,2)%sort==-4 .or. BC_face(1,2)%sort==-41 ) call bc_inlet_imax
     if (BC_face(1,2)%sort==-5) call bc_outlet_imax
     !if (BC_face(1,2)%sort==-5) call bc_backpressure_prs_imax
 
-    if (BC_face(2,1)%sort==-4) call bc_inlet_jmin
+    if (BC_face(2,1)%sort==-4 .or. BC_face(2,1)%sort==-41 ) call bc_inlet_jmin
     if (BC_face(2,1)%sort==-5) call bc_outlet_jmin
 
-    if (BC_face(2,2)%sort==-4) call bc_inlet_jmax
+    if (BC_face(2,2)%sort==-4 .or. BC_face(2,2)%sort==-41) call bc_inlet_jmax
     if (BC_face(2,2)%sort==-5) call bc_outlet_jmax
 
-    if (BC_face(3,1)%sort==-4) call bc_inlet_kmin
+    if (BC_face(3,1)%sort==-4 .or. BC_face(3,1)%sort==-41) call bc_inlet_kmin
     if (BC_face(3,1)%sort==-5) call bc_outlet_kmin
 
-    if (BC_face(3,2)%sort==-4) call bc_inlet_kmax
+    if (BC_face(3,2)%sort==-4 .or. BC_face(3,2)%sort==-41) call bc_inlet_kmax
     if (BC_face(3,2)%sort==-5) call bc_outlet_kmax
 
 !!$    else

@@ -27,6 +27,9 @@ module mod_bc
      ! time-averaged primitive variables for Tam & Dong BC
      ! [last index 1...6 corresponds to rho0,u0,v0,w0,p0,c02]
      real(wp), dimension(:,:,:,:), pointer :: U0
+     ! time-averaged primitive variables for Riemann perturbed (RFM) BC
+     ! [last index 1...3 corresponds to roc0,prs_RHS0,Uin_RHS0]
+     real(wp), dimension(:,:,:,:), pointer :: U0R
   end type border_face
   !---------------------------------------------------------------------------
   type border_edge
@@ -47,7 +50,7 @@ module mod_bc
   !---------------------------------------------------------------------------
   ! Boundary conditions
   logical :: is_boundary(3,2),is_TamDong,is_TamDong3D,is_TamDong_1pt
-  logical :: is_inlet_outlet
+  logical :: is_inlet_outlet,is_inlet_outlet_pert
   logical :: is_bc_wall(3,2),is_bc_wall2(3,2)
   logical :: is_bc_TD(3,2),is_bc_1pt(3,2)
   logical :: is_bc_slip,is_slip(3,2) ! slip wall BC
@@ -90,7 +93,7 @@ contains
     integer :: i,j,k
     integer :: nbl_W,nbl_E,nbl_S,nbl_N
     logical :: is_TamDong_proc,is_TamDong_1pt_proc,is_BCref_proc
-    logical :: is_inlet_outlet_proc,is_bc_slip_proc
+    logical :: is_inlet_outlet_proc,is_bc_slip_proc, is_inlet_outlet_pert_proc
     logical :: is_errBC,is_errBC_proc
     ! ---------------------------------------------------------------------------
 
@@ -217,6 +220,17 @@ contains
        enddo
     enddo
     call MPI_ALLREDUCE(is_inlet_outlet_proc,is_inlet_outlet,1,MPI_LOGICAL,MPI_LOR,COMM_global,info)
+
+    ! Determine indicator is_inlet_outlet_pert_proc
+    ! ---------------------------------------------
+    is_inlet_outlet_pert=.false.
+    is_inlet_outlet_pert_proc=.false.
+    do i=1,3
+       do j=1,2
+          if ((BC_face(i,j)%sort==-41)) is_inlet_outlet_pert_proc=.true.
+       enddo
+    enddo
+    call MPI_ALLREDUCE(is_inlet_outlet_pert_proc,is_inlet_outlet_pert,1,MPI_LOGICAL,MPI_LOR,COMM_global,info)
 
     ! Determine indicators is_TamDong
     ! -------------------------------

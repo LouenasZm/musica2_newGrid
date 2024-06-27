@@ -280,6 +280,18 @@ subroutine alloc_tab
      endif
   endif
 
+    ! for perturbed Riemann BC
+  ! ========================
+
+  if (BC_face(1,1)%sort==-41) allocate(BC_face(1,1)%U0R(1,1:ny,1:nz,3))
+  if (BC_face(1,2)%sort==-41) allocate(BC_face(1,2)%U0R(1,1:ny,1:nz,3))
+  if (BC_face(2,1)%sort==-41) allocate(BC_face(2,1)%U0R(1:nx,1,1:nz,3))
+  if (BC_face(2,2)%sort==-41) allocate(BC_face(2,2)%U0R(1:nx,1,1:nz,3))
+  if (.not.is_2d) then
+     if (BC_face(3,1)%sort==-41) allocate(BC_face(3,1)%U0R(1:nx,1:ny,1,3))
+     if (BC_face(3,2)%sort==-41) allocate(BC_face(3,2)%U0R(1:nx,1:ny,1,3))
+  endif
+
 end subroutine alloc_tab
 
 !===============================================================================

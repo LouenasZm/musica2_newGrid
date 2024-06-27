@@ -11,6 +11,7 @@ module mod_io
   use mod_time     ! <- for tstar
   use mod_tecplot  ! <- module defining Tecplot/Bin I/O
   use mod_io_restartTD
+  use mod_io_restartR
   implicit none
   ! -------------------------------------------------------------------------------------------
   ! options for creating binary file
@@ -379,6 +380,17 @@ contains
        if (operation==READ) call read_restartTD(TDfile,restartTD)
        
     endif ! end if is_TamDong
+
+    ! ===========================================================
+    ! Read/Write time-averaged variables for Riemann perturbed BC
+    ! ===========================================================
+    if (is_inlet_outlet_pert) then
+
+        if (operation==WRITE) call write_restartR
+        
+        if (operation==READ) call read_restartR
+        
+     endif ! end if is_inlet_outlet_pert
     
   end subroutine read_write_volume
 

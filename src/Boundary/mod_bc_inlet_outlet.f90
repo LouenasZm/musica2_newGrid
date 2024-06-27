@@ -26,10 +26,95 @@ module mod_bc_inlet_outlet
       real(wp), dimension(:,:), allocatable :: cdir_kmin,cdir_kmax
       ! normal component of velocity for Riemann invariants
       real(wp) :: Uin,Ubn
+      ! moving average
+      real(wp), dimension(:,:,:), allocatable :: mov_avg
+      real(wp), dimension(:,:,:,:), allocatable :: mov_inst
+      integer :: nmoy_x,nmoy_t,freq_avg ! -> how many points in space and time to average over
+      integer :: i
       !------------------------------------------------------------------------------
     
     contains
     
+    !==============================================================================
+    subroutine init_U0R_bc_inlet_outlet
+    !==============================================================================
+        !> Initialization of time-averaged primitives for perturbed Riemann
+        !> /!\ the time-averages are from the domain interior point, NOT the BC one
+        !> [only 2D BC, extruded along z]
+    !==============================================================================
+        use mod_mpi
+        implicit none
+        !----------------------------------------------------------------------------
+        integer :: i,j,k
+        !----------------------------------------------------------------------------
+    
+    
+        if (BC_face(1,1)%sort==-41) then
+           ! imin (left) boundary condition
+           ! ------------------------------
+           BC_face(1,1)%U0R(1,:,:,1)=rho(2,1:ny,1:nz)*c_(2,1:ny,1:nz)
+           BC_face(1,1)%U0R(1,:,:,2)=prs(2,1:ny,1:nz)
+           BC_face(1,1)%U0R(1,:,:,3)=sign_imin*( uu(2,1:ny,1:nz)*nxn_imin(1:ny,1:nz) + &
+                                                 vv(2,1:ny,1:nz)*nyn_imin(1:ny,1:nz) + &
+                                                 ww(2,1:ny,1:nz)*nzn_imin(1:ny,1:nz) )
+        endif
+    
+        if (BC_face(1,2)%sort==-41) then
+           ! imax (right) boundary condition
+           ! ------------------------------
+           BC_face(1,2)%U0R(1,:,:,1)=rho(nx-1,1:ny,1:nz)*c_(nx-1,1:ny,1:nz)
+           BC_face(1,2)%U0R(1,:,:,2)=prs(nx-1,1:ny,1:nz)
+           BC_face(1,2)%U0R(1,:,:,3)=sign_imax*( uu(nx-1,1:ny,1:nz)*nxn_imax(1:ny,1:nz) + &
+                                                 vv(nx-1,1:ny,1:nz)*nyn_imax(1:ny,1:nz) + &
+                                                 ww(nx-1,1:ny,1:nz)*nzn_imax(1:ny,1:nz) )
+        endif
+    
+        if (BC_face(2,1)%sort==-41) then
+           ! jmin (bottom) boundary condition
+           ! --------------------------------
+           BC_face(2,1)%U0R(1,:,:,1)=rho(1:nx,2,1:nz)*c_(1:nx,2,1:nz)
+           BC_face(2,1)%U0R(1,:,:,2)=prs(1:nx,2,1:nz)
+           BC_face(2,1)%U0R(1,:,:,3)=sign_jmin*( uu(1:nx,2,1:nz)*nxn_jmin(1:nx,1:nz) + &
+                                                 vv(1:nx,2,1:nz)*nyn_jmin(1:nx,1:nz) + &
+                                                 ww(1:nx,2,1:nz)*nzn_jmin(1:nx,1:nz) )
+        endif
+    
+        if (BC_face(2,2)%sort==-41) then
+           ! jmax (top) boundary condition
+           ! -----------------------------
+           BC_face(2,2)%U0R(1,:,:,1)=rho(1:nx,ny-1,1:nz)*c_(1:nx,ny-1,1:nz)
+           BC_face(2,2)%U0R(1,:,:,2)=prs(1:nx,ny-1,1:nz)
+           BC_face(2,2)%U0R(1,:,:,3)=sign_jmax*( uu(1:nx,ny-1,1:nz)*nxn_jmax(1:nx,1:nz) + &
+                                                 vv(1:nx,ny-1,1:nz)*nyn_jmax(1:nx,1:nz) + &
+                                                 ww(1:nx,ny-1,1:nz)*nzn_jmax(1:nx,1:nz) )
+        endif
+        
+        if (.not.is_2d) then
+    
+           if (BC_face(3,1)%sort==-41) then
+              ! kmin (front) boundary condition
+              ! -------------------------------
+              BC_face(3,1)%U0R(1,:,:,1)=rho(1:nx,1:ny,2)*c_(1:nx,1:ny,2)
+              BC_face(3,1)%U0R(1,:,:,2)=prs(1:nx,1:ny,2)
+              BC_face(3,1)%U0R(1,:,:,3)=sign_kmin*( uu(1:nx,1:ny,2)*nxn_kmin(1:nx,1:ny) + &
+                                                    vv(1:nx,1:ny,2)*nyn_kmin(1:nx,1:ny) + &
+                                                    ww(1:nx,1:ny,2)*nzn_kmin(1:nx,1:ny) )
+           endif
+    
+           if (BC_face(3,2)%sort==-41) then
+              ! kmax (back) boundary condition
+              ! ------------------------------
+              BC_face(3,2)%U0R(1,:,:,1)=rho(1:nx,1:ny,nz-1)*c_(1:nx,1:ny,nz-1)
+              BC_face(3,2)%U0R(1,:,:,2)=prs(1:nx,1:ny,nz-1)
+              BC_face(3,2)%U0R(1,:,:,3)=sign_kmax*( uu(1:nx,1:ny,nz-1)*nxn_kmax(1:nx,1:ny) + &
+                                                    vv(1:nx,1:ny,nz-1)*nyn_kmax(1:nx,1:ny) + &
+                                                    ww(1:nx,1:ny,nz-1)*nzn_kmax(1:nx,1:ny) )
+           endif
+        
+        endif
+      
+    end subroutine init_U0R_bc_inlet_outlet      
+
       !==============================================================================
       subroutine init_bc_inlet_outlet
       !==============================================================================
@@ -47,6 +132,8 @@ module mod_bc_inlet_outlet
         real(wp) :: ui,vi,wi,Unorm,Mi
         ! local direction angles of velocity vector
         real(wp) :: theta_vel,phi_vel
+        ! check if restartR file exists
+        logical :: Rfile_exists
         !----------------------------------------------------------------------------
     
         ! Constant direction of the velocity at the boundary
@@ -150,9 +237,11 @@ module mod_bc_inlet_outlet
         !    correct_sign=+1 if (db.nb)>0
         !    correct_sign=-1 if (db.nb)<0
         
+
+
         ! Inlet BC at imin
         ! ================
-        if (BC_face(1,1)%sort==-4) then
+        if (BC_face(1,1)%sort==-4.or.(BC_face(1,1)%sort==-41)) then
     
            ! Allocations
            ! -----------
@@ -281,11 +370,20 @@ module mod_bc_inlet_outlet
                  cdir_imin(j,k)=sign_imin/(db(j,k,1)*nxn_imin(j,k)+db(j,k,2)*nyn_imin(j,k)+db(j,k,3)*nzn_imin(j,k))
               enddo
            enddo
+
+
+            ! Time-average init
+            ! -----------------
+            if (is_inlet_outlet_pert) then
+                inquire(file="restartR.bin",exist=Rfile_exists)
+                if (.not.Rfile_exists) call init_U0R_bc_inlet_outlet
+            endif
+
         endif
     
         ! Inlet BC at imax
         ! ================
-        if (BC_face(1,2)%sort==-4) then
+        if (BC_face(1,2)%sort==-4 .or.(BC_face(1,2)%sort==-41)) then
            
            ! Allocations
            ! -----------
@@ -378,7 +476,7 @@ module mod_bc_inlet_outlet
     
         ! Inlet BC at jmin
         ! ================
-        if (BC_face(2,1)%sort==-4) then
+        if (BC_face(2,1)%sort==-4.or.(BC_face(2,1)%sort==-41)) then
            
            ! Allocations
            ! -----------
@@ -471,7 +569,7 @@ module mod_bc_inlet_outlet
     
         ! Inlet BC at jmax
         ! ================
-        if (BC_face(2,2)%sort==-4) then
+        if (BC_face(2,2)%sort==-4.or.(BC_face(2,2)%sort==-41)) then
            
            ! Allocations
            ! -----------
@@ -564,7 +662,7 @@ module mod_bc_inlet_outlet
     
         ! Inlet BC at kmin
         ! ================
-        if (BC_face(3,1)%sort==-4) then
+        if (BC_face(3,1)%sort==-4.or.(BC_face(3,1)%sort==-41)) then
                  
            ! Allocations
            ! -----------
@@ -657,7 +755,7 @@ module mod_bc_inlet_outlet
     
         ! Inlet BC at kmax
         ! ================
-        if (BC_face(3,2)%sort==-4) then
+        if (BC_face(3,2)%sort==-4.or. BC_face(3,2)%sort==-41) then
            
            ! Allocations
            ! -----------
@@ -780,15 +878,31 @@ module mod_bc_inlet_outlet
         ! Riemann invariant dp-(roc)_0 dU
         real(wp) :: am0,roc0,coeff
         ! quantities at boundary points
-        real(wp) :: rob,Tb,pb, prs_RHS, Uin_RHS
+        real(wp) :: rob,Tb,pb
         ! ---------------------------------------------------------------------------
         ! param for fluctuations
         real(wp), dimension(ny,nz) :: u_in,v_in,w_in
         ! ---------------------------------------------------------------------------
+        ! param for averaging
+         real(wp) :: nn1,inn1,ndeb_Riemann_pert
+        ! test for higher-order extrapolation and derivatives for Riemann invariants
+         real(wp) :: prs_RHS,Uin_RHS
+        ! ---------------------------------------------------------------------------
     
+        ! Index of left boundary: i=1
+        i = 1
+        ! Perturbed Riemann BC params
+        ! ===========================
+        ndeb_Riemann_pert = 1
+        freq_avg = 9999999963
         ! Update inlet points
         ! ===================
-        if (is_RFM) call disturb_inlet_RFM_turb(u_in,v_in,w_in)
+        if (is_RFM) then
+            call disturb_inlet_RFM_turb(u_in,v_in,w_in)
+            if (is_2d) then
+               w_in = 0.0_wp
+            endif
+        endif
     
         ! Update inlet points
         ! ===================
@@ -799,16 +913,17 @@ module mod_bc_inlet_outlet
               ! ==============================
               
               ! normal velocity at interior nodes Uin=Ui.nb
-              Uin= uu(2,j,k)*nxn_imin(j,k)+vv(2,j,k)*nyn_imin(j,k)+ww(2,j,k)*nzn_imin(j,k)
+              !Uin= uu(2,j,k)*nxn_imin(j,k)+vv(2,j,k)*nyn_imin(j,k)+ww(2,j,k)*nzn_imin(j,k)
     
               !if ((j==1.or.j==ny).and.(k==1).and.(irk==nrk)) print *,ntime,j,Uin
               
               ! correct sign to have inwards velocity
-              Uin=sign_imin*Uin
+              !Uin=sign_imin*Uin
               
               ! product (roc)_0 (extrapolated from interior)
               !roc0=rho_n(2,j,k)*c_(2,j,k)
               ! 4 th order extrapolation
+
               roc0=1.0_wp/a04(1)*( -(a04(2)*rho_n(2,j,k)*c_(2,j,k) + &
                                      a04(3)*rho_n(3,j,k)*c_(3,j,k) + &
                                      a04(4)*rho_n(4,j,k)*c_(4,j,k) + &
@@ -822,8 +937,28 @@ module mod_bc_inlet_outlet
                                          a04(4)*prs(4,j,k)+a04(5)*prs(5,j,k) )
               Uin_RHS = -1.0_wp/a04(1)*( a04(2)* uu(2,j,k)+a04(3)* uu(3,j,k) + &
                                          a04(4)* uu(4,j,k)+a04(5)* uu(5,j,k) )*sign_imin
-              !am0= prs(2,j,k)-roc0*Uin
-              am0= prs_RHS - roc0*Uin_RHS
+            
+              if (.not.is_inlet_outlet_pert) then
+            
+                !am0= prs(2,j,k)-roc0*Uin
+                am0= prs_RHS - roc0*Uin_RHS
+              else
+                ! Riemann invariant computed from time-averaged field
+                ! ---------------------------------------------------
+                if (irk.eq.nrk.and.(mod(ntime,freq_avg).eq.0)) then
+                   ! roc0
+                   BC_face(1,1)%U0R(1,j,k,1)=((nn1-1.0_wp)*BC_face(1,1)%U0R(1,j,k,1)+roc0)*inn1
+                   BC_face(1,1)%U0R(1,j,k,2)=((nn1-1.0_wp)*BC_face(1,1)%U0R(1,j,k,2)+prs_RHS)*inn1
+                   BC_face(1,1)%U0R(1,j,k,3)=((nn1-1.0_wp)*BC_face(1,1)%U0R(1,j,k,3)+Uin_RHS)*inn1
+                endif
+                ! product (roc)_0 (extrapolated from interior)
+                roc0=BC_face(1,1)%U0R(1,j,k,1)
+                
+                ! compute outgoing characteristic from interior nodes
+                ! dp-(roc)_0 dU=cste <=> pb-(roc)_0 Ubn=pi-(roc)_0 Uin=am0
+                am0=BC_face(1,1)%U0R(1,j,k,2)-roc0*BC_face(1,1)%U0R(1,j,k,3)
+              endif
+
               ! coefficient taken flow direction into account
               coeff=(cdir_imin(j,k)/roc0)**2
     
