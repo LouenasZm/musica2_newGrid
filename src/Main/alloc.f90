@@ -258,6 +258,10 @@ subroutine alloc_tab
             allocate(     Hre_theta(nx1:nx2,ny1:ny2,nz1:nz2))
             allocate(     Kre_theta(nx1:nx2,ny1:ny2,nz1:nz2))
             allocate(        Stheta(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(       magn_u(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(      dmagn_ux(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(      dmagn_uy(nx1:nx2,ny1:ny2,nz1:nz2))
+            allocate(      dmagn_uz(nx1:nx2,ny1:ny2,nz1:nz2))
         endif
         
      endif

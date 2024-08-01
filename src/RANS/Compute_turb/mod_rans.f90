@@ -61,13 +61,13 @@ module mod_rans
   ! =====================
   
   ! Source terms of gamma and Re_theta:
-  real(wp)  :: magn_u, du_ds, magn_u2, T_stheta, delta_stheta, F_theta
+  real(wp)  :: du_ds, magn_u2, T_stheta, delta_stheta, F_theta
   real(wp)  :: theta, lambda_theta, f_lambda_t, Re_theta_t, re_theta_crit
   real(wp)  :: re_nu, re_turb, F_turb, F_onset1, F_onset2, F_onset3, F_onset, F_length, F_reattach
   real(wp)  :: p_gamma, d_gamma
   ! Intermittency in equation of nutil:
   real(wp)  :: intermittency_sep
-  real(wp), dimension(:,:,:), allocatable :: Sgamma, Stheta
+  real(wp), dimension(:,:,:), allocatable :: Sgamma, Stheta, magn_u, dmagn_ux, dmagn_uy, dmagn_uz
   ! Model parameters:
   real(wp), parameter  :: sigma_theta_t= 2.0_wp, ce2=50.0_wp, ctheta_t=0.03_wp, ca1=2.0_wp, ca2=0.06_wp
 

@@ -8,11 +8,12 @@ subroutine source_SA_transition
   use mod_mpi
   use mod_wall_dist
   use mod_turb_model_length_scale
+  use mod_interface
   implicit none
   ! ---------------------------------------------------------------------------
   integer  :: i,j,k
   real(wp) :: nu,D11,D12,D13,D21,D22,D23,D31,D32,D33,D_om,ksi_nu,g_n, D_mag
-  real(wp) :: cw36,inv_6,inv_kap2, cnu13
+  real(wp) :: cw36,inv_6,inv_kap2, cnu13 
   real(wp), parameter :: TWO_THIRDS=2.0_wp/3.0_wp, large_St1=5.0E3_wp
   ! ---------------------------------------------------------------------------
 
@@ -31,7 +32,18 @@ subroutine source_SA_transition
   cw1  = cb1*inv_kap2+(1.0_wp+cb2)/sig
   cw2  = 0.3_wp
   cw3  = 2.0_wp
-  
+
+  do k=ndz_s_r,nfz_s_r 
+    do j=ndy_s_r,nfy_s_r
+       do i=ndx_s_r,nfx_s_r
+            magn_u(i,j,k)   = sqrt( uu(i,j,k)**2 + vv(i,j,k)**2 + ww(i,j,k)**2 )
+       enddo
+    enddo
+  enddo
+
+  call grad_rans(magn_u, dmagn_ux, dmagn_uy, dmagn_uz)
+  call communication_grad_rans(dmagn_ux, dmagn_uy, dmagn_uz)
+
   do k=ndz_s_r,nfz_s_r 
      do j=ndy_s_r,nfy_s_r
         do i=ndx_s_r,nfx_s_r
@@ -54,8 +66,7 @@ subroutine source_SA_transition
             magn_om = sqrt(4.0_wp*(om12**2+om13**2+om23**2))
 
             ! U magnitude of velocity:
-            magn_u  = sqrt( uu(i,j,k)**2 + vv(i,j,k)**2 + ww(i,j,k)**2 )
-            magn_u2 = uu(i,j,k)**2 + vv(i,j,k)**2 + ww(i,j,k)**2
+            magn_u2         = uu(i,j,k)**2 + vv(i,j,k)**2 + ww(i,j,k)**2
 
             ! T:
             T_stheta = 500.0_wp * nu / magn_u2
@@ -67,14 +78,15 @@ subroutine source_SA_transition
             ! F_theta:
             F_theta = min( max( exp(-(lengthscale(i,j,k)/delta_stheta)**4 ), 1.0_wp-((intermittency(i,j,k) - 1.0_wp/ce2)/(1.0_wp - 1.0_wp/ce2))**2 ), 1.0_wp)
 
-            ! Re_theta_t in production term of reynolds_theta:
-            du_ds           = (uu(i,j,k)*uu(i,j,k)*dux(i,j,k) + vv(i,j,k)*uu(i,j,k)*dvx(i,j,k) + uu(i,j,k)*vv(i,j,k)*duy(i,j,k) + vv(i,j,k)*vv(i,j,k)*dvy(i,j,k))/magn_u2
-            if(.not. is_2D)then 
-                du_ds = du_ds + (ww(i,j,k)*uu(i,j,k)*dwx(i,j,k) + ww(i,j,k)*vv(i,j,k)*dwy(i,j,k) + &
-                                uu(i,j,k)*ww(i,j,k)*duz(i,j,k) + vv(i,j,k)*ww(i,j,k)*dvz(i,j,k) + ww(i,j,k)*ww(i,j,k)*dwz(i,j,k))/magn_u2
-            endif
+            ! Re_theta_t in production term of reynolds_theta:  
+            du_ds   = dmagn_ux(i,j,k)
+            !du_ds           = (uu(i,j,k)*uu(i,j,k)*dux(i,j,k) + vv(i,j,k)*uu(i,j,k)*dvx(i,j,k) + uu(i,j,k)*vv(i,j,k)*duy(i,j,k) + vv(i,j,k)*vv(i,j,k)*dvy(i,j,k))/magn_u2
+            !if(.not. is_2D)then 
+            !    du_ds = du_ds + (ww(i,j,k)*uu(i,j,k)*dwx(i,j,k) + ww(i,j,k)*vv(i,j,k)*dwy(i,j,k) + &
+            !                    uu(i,j,k)*ww(i,j,k)*duz(i,j,k) + vv(i,j,k)*ww(i,j,k)*dvz(i,j,k) + ww(i,j,k)*ww(i,j,k)*dwz(i,j,k))/magn_u2
+            !endif
             
-            theta           = reynolds_theta(i,j,k)*nu/magn_u
+            theta           = reynolds_theta(i,j,k)*nu/magn_u(i,j,k)
             lambda_theta    = theta**2*du_ds/nu 
             ! Limiter for Lambda_theta:
             if (lambda_theta .lt. -0.1_wp)then
