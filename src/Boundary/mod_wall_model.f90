@@ -209,9 +209,11 @@ contains
     endif
 
 
-
-
   end subroutine init_wm
+
+  !=====================================================================================================================================================================
+  !                                         Algebraic wall model
+  !=====================================================================================================================================================================
 
   !==============================================================================
   subroutine bc_wm_alg_jmin
@@ -597,8 +599,9 @@ contains
 
   end subroutine wm_alg_spalding
 
-
-
+  !=================================================================================================================================================================
+  !                                             Ordinary Differential Equation model
+  !=================================================================================================================================================================
 
   !==============================================================================
   subroutine bc_wm_ODE_jmin
@@ -924,5 +927,248 @@ subroutine tdma( n, a, b, c, d, x )
    enddo
 end subroutine tdma
 
+!=================================================================================================================================================================
+!                                             Algebraic wall model supplemented with the Wall-Adaptive Local Eddy-Viscosity (WALE)
+!=================================================================================================================================================================
+ !==============================================================================
+subroutine bc_wm_wale_jmin
+    !==============================================================================
+      !> Use algebraic model
+    !==============================================================================
+      implicit none
+      ! ---------------------------------------------------------------------------
+      integer :: i,k,j0,j1
+      real(wp) :: tau_w,u_e,T_e,r_e,T_w,r_w,mu_w,hwm,utau_wm, q_w
+      ! ---------------------------------------------------------------------------
+      real(wp) :: g11, g22, g33, g12, g13, g23, trace_g , visc_sgs, sum_gij
+      real(wp) :: S11_w, S22_w, S33_w, S12_w, S13_w, S23_w, sum_Sij
+      real(wp), parameter :: coeff = sqrt(10.6_wp)
+      ! ---------------------------------------------------------------------------
+  
+      j0 = 1; j1 = j0+wm_ind
+      hwm = abs(y(j1) - y(j0))
+  
+      do k=1,nz
+         do i=1,nx
+            ! Give first guess for Utau
+            utau_wm = utau_jmin(i,k)
+            ! Fill edge values
+            u_e = (uu(i,j1,k)**2 + ww(i,j1,k)**2)**0.5_wp
+            ! u_e = uu(i,j1,k)
+            T_e = Tmp(i,j1,k)
+            r_e = rho(i,j1,k)
+            ! Fill wall values
+            T_w = Tmp(i,j0,k)
+            r_w = rho(i,j0,k)
+            mu_w = visc(i,j0,k)
+  
+            ! Only implemented with spalding for the moment
+            call wm_alg_spalding(u_e,T_e,r_e,T_w,r_w,mu_w,hwm,utau_wm,q_w)
+  
+            ! Store new value
+            utau_jmin(i,k) = utau_wm
+  
+            ! Calculation of tau_w
+            tau_w = rho(i,j0,k)*utau_jmin(i,k)**2
+  
+
+            ! Impose wall-model values
+            Frhou(i,j0,k) = 0.0_wp; Frhow(i,j0,k) = 0.0_wp
+            Grhov(i,j0,k) = 0.0_wp; Grhow(i,j0,k) = 0.0_wp
+            Hrhou(i,j0,k) = 0.0_wp; Hrhov(i,j0,k) = 0.0_wp; Hrhow(i,j0,k) = 0.0_wp; Hrhoe(i,j0,k) = 0.0_wp
+            Frhov(i,j0,k) = -dir_jmin*tau_w
+            Grhou(i,j0,k) = -dir_jmin*tau_w
+            Frhoe(i,j0,k) = -dir_jmin*q_w
+            Grhoe(i,j0,k) = -dir_jmin*q_w
+         enddo
+      enddo
+    !==============================================================================
+    !> Supplement with WALE model at the wall
+    !==============================================================================
+    do k=1,nz 
+        do i=1,nx 
+            ! Compute traceless symmetric part of the square of the velocity gradient tensor:
+            trace_g = dux(i,j0,k)**2 + duy(i,j0,k)**2 + duz(i,j0,k)**2
+            g11     = dux(i,j0,k)**2 - ONE_THIRD*trace_g
+            g22     = dvy(i,j0,k)**2 - ONE_THIRD*trace_g
+            g33     = dwz(i,j0,k)**2 - ONE_THIRD*trace_g
+            g12     = 0.5_wp*(dux(i,j0,k)**2 + dvx(i,j0,k)**2) 
+            g13     = 0.5_wp*(duz(i,j0,k)**2 + dwx(i,j0,k)**2) 
+            g23     = 0.5_wp*(dvz(i,j0,k)**2 + dwy(i,j0,k)**2) 
+            ! Compute (G_ij G_ij) in nu_sgs: 
+            sum_gij = g11**2 + g22**2 + g33**2 + 2*g12**2 + 2*g13**2 + 2*g23**2 
+            ! Compute S_ij at wall: 
+            S11_w   = dux(i,j0,k)
+            S22_w   = dvy(i,j0,k)
+            S33_w   = dwz(i,j0,k)
+            S12_w   = 0.5_wp*(duy(i,j0,k)+dvx(i,j0,k))
+            S13_w   = 0.5_wp*(duz(i,j0,k)+dwx(i,j0,k))
+            S23_w   = 0.5_wp*(dvz(i,j0,k)+dwy(i,j0,k))
+            sum_Sij = S11_w**2 + S22_w**2 + S33_w**2 + 2*S12_w**2 + 2*S13_w**2 + 2*S23_w**2 
+            ! Get nu_sgs: 
+            visc_sgs    = coeff*Cs_SM*sum_gij**(3.0_wp/2.0_wp)/( sum_Sij**(5.0_wp/2.0_wp) + sum_gij**(5.0_wp/4.0_wp) )
+            Frhov(i,j0,k) = Frhov(i,j0,k) - visc_sgs* 2.0_wp * S12(i,j0,k)
+            Grhou(i,j0,k) = Grhou(i,j0,k) - visc_sgs* 2.0_wp * S12(i,j0,k)
+
+        enddo
+    enddo
+    end subroutine bc_wm_wale_jmin
+  
+    !==============================================================================
+    subroutine bc_wm_wale_jmax
+    !==============================================================================
+      !> Use algebraic model
+    !==============================================================================
+      implicit none
+      ! ---------------------------------------------------------------------------
+      integer :: i,k,j0,j1
+      real(wp) :: tau_w,u_e,T_e,r_e,T_w,r_w,mu_w,hwm,utau_wm, q_w
+      ! ---------------------------------------------------------------------------
+      ! ! Test stochastic forcing
+      ! real(wp) :: tau11,tau22,tau33,tau12,tau13,tau23,trace,mu
+      ! real(wp) :: coeff_kappa,var,yp_
+      ! real(wp) :: dupx,dupy,dupz,dvpx,dvpy,dvpz,dwpx,dwpy,dwpz
+      ! real(wp), parameter :: sp_kappa = 0.41_wp
+      ! ! random number generator
+      ! real(wp) :: randomnb
+      ! integer :: nseed
+      ! integer, dimension(:), allocatable :: initseed
+  
+      j0 = ny; j1 = j0-wm_ind
+      hwm = abs(y(j1) - y(j0))
+  
+      do k=1,nz
+         do i=1,nx
+            ! Give first guess for Utau
+            utau_wm = utau_jmax(i,k)
+            ! Fill edge values
+            u_e = (uu(i,j1,k)**2 + ww(i,j1,k)**2)**0.5_wp
+            ! u_e = uu(i,j1,k)
+            T_e = Tmp(i,j1,k)
+            r_e = rho(i,j1,k)
+            ! Fill wall values
+            T_w = Tmp(i,j0,k)
+            r_w = rho(i,j0,k)
+            mu_w = visc(i,j0,k)
+  
+            ! Only implemented with spalding for the moment
+            call wm_alg_spalding(u_e,T_e,r_e,T_w,r_w,mu_w,hwm,utau_wm,q_w)
+  
+            ! Store new value
+            utau_jmax(i,k) = utau_wm
+  
+            ! Calculation of tau_w
+            tau_w = rho(i,j0,k)*utau_jmax(i,k)**2
+  
+            ! Impose wall-model values
+            Frhou(i,j0,k) = 0.0_wp; Frhow(i,j0,k) = 0.0_wp
+            Grhov(i,j0,k) = 0.0_wp; Grhow(i,j0,k) = 0.0_wp
+            Hrhou(i,j0,k) = 0.0_wp; Hrhov(i,j0,k) = 0.0_wp; Hrhow(i,j0,k) = 0.0_wp; Hrhoe(i,j0,k) = 0.0_wp
+            Frhov(i,j0,k) = -dir_jmax*tau_w
+            Grhou(i,j0,k) = -dir_jmax*tau_w
+            Frhoe(i,j0,k) = -dir_jmax*q_w
+            Grhoe(i,j0,k) = -dir_jmax*q_w
+         enddo
+      enddo
+  
+   !    ! Stochastic forcing on j=ny-1
+   !    ! ==================
+   !    ! j=ny-1
+   !    j=j1
+   !    coeff_kappa = 1.0_wp/(15*sp_kappa)**0.5
+   !    var = 0.0_wp
+  
+   !    ! Initialization of random number generator
+   !    !------------------------------------------
+   !    call random_seed(size=nseed)
+   !    allocate(initseed(nseed))
+   !    do k=1,iproc+1
+   !       call random_number(randomnb)
+   !    enddo
+   !    do k=1,nseed
+   !       call random_number(randomnb)
+   !       initseed(k) = int(randomnb*10**8) * (-1)**k * iproc
+   !    enddo
+   !    call random_seed(put=initseed)
+   !    deallocate(initseed)
+  
+   !    ! if ((iproc.eq.0).or.(iproc.eq.1)) then
+   !    do k=1,nz
+   !       do i=1,nx
+   !          yp_ = abs(y(j)-y(j0))*utau_jmax(i,k)*rho(i,j0,k)/visc(i,j0,k)
+   !          tau_w = rho(i,j0,k)*utau_jmax(i,k)**2
+   !          tau_w = tau_w*coeff_kappa/(yp_)**0.5/visc(i,j0,k)
+   !          call random_number(var)
+   !          dupx = tau_w * (2)**0.5 * ERF(2*var-1) ! du'/dx
+   !          call random_number(var)
+   !          dupy = tau_w * 2 * ERF(2*var-1) ! du'/dy
+   !          call random_number(var)
+   !          dupz = tau_w * 2 * ERF(2*var-1) ! du'/dz
+   !          call random_number(var)
+   !          dvpx = tau_w * 2 * ERF(2*var-1) ! dv'/dx
+   !          call random_number(var)
+   !          dvpy = tau_w * (2)**0.5 * ERF(2*var-1) ! dv'/dy
+   !          call random_number(var)
+   !          dvpz = tau_w * 2 * ERF(2*var-1) ! dv'/dz
+   !          call random_number(var)
+   !          dwpx = tau_w * 2 * ERF(2*var-1) ! dw'/dx
+   !          call random_number(var)
+   !          dwpy = tau_w * 2 * ERF(2*var-1) ! dw'/dy
+   !          call random_number(var)
+   !          dwpz = tau_w * (2)**0.5 * ERF(2*var-1) ! dw'/dz
+   !          ! print *,"dup",iproc,dupx,dupy,dupz
+   !          ! print *,"dvp",iproc,dvpx,dvpy,dvpz
+   !          ! print *,"dwp",iproc,dwpx,dwpy,dwpz
+  
+   !          ! print *,"Frhou bef",Frhou(i,j,k)
+   !          ! print *,"Frhov bef",Frhov(i,j,k)
+  
+  
+   !          ! compute S_ij
+   !          tau11 = dupx
+   !          tau22 = dvpy
+   !          tau33 = dwpz
+   !          tau12 = 0.5_wp*(dupy + dvpx)
+   !          tau13 = 0.5_wp*(dupz + dwpx)
+   !          tau23 = 0.5_wp*(dvpz + dwpy)
+   !          trace = ONE_THIRD*(tau11+tau22+tau33)
+  
+   !          ! compute -tau_ij
+   !          mu =-2.0_wp*visc(i,j,k)
+   !          tau11=mu*(tau11-trace)
+   !          tau22=mu*(tau22-trace)
+   !          tau33=mu*(tau33-trace)
+   !          tau12=mu*tau12
+   !          tau13=mu*tau13
+   !          tau23=mu*tau23
+  
+   !          ! viscous fluxes along x
+   !          Frhou(i,j,k) = Frhou(i,j,k) + tau11
+   !          Frhov(i,j,k) = Frhov(i,j,k) + tau12
+   !          Frhow(i,j,k) = Frhow(i,j,k) + tau13
+   !          Frhoe(i,j,k) = Frhoe(i,j,k) + (uu(i,j,k)*tau11 + vv(i,j,k)*tau12 + ww(i,j,k)*tau13)
+  
+   !          ! viscous fluxes along y
+   !          Grhou(i,j,k) = Grhou(i,j,k) + tau12
+   !          Grhov(i,j,k) = Grhov(i,j,k) + tau22
+   !          Grhow(i,j,k) = Grhow(i,j,k) + tau23
+   !          Grhoe(i,j,k) = Grhoe(i,j,k) + (uu(i,j,k)*tau12 + vv(i,j,k)*tau22 + ww(i,j,k)*tau23)
+  
+   !          ! viscous fluxes along z
+   !          Hrhou(i,j,k) = Hrhou(i,j,k) + tau13
+   !          Hrhov(i,j,k) = Hrhov(i,j,k) + tau23
+   !          Hrhow(i,j,k) = Hrhow(i,j,k) + tau33
+   !          Hrhoe(i,j,k) = Hrhoe(i,j,k) + (uu(i,j,k)*tau13 + vv(i,j,k)*tau23 + ww(i,j,k)*tau33)
+  
+   !          ! print *,"Frhou af",Frhou(i,j,k)
+   !          ! print *,"Frhov af",Frhov(i,j,k)
+  
+   !          ! call mpistop('',0)
+   !       enddo
+   !    enddo
+   ! ! endif
+  
+    end subroutine bc_wm_wale_jmax
+  
 
 end module mod_wall_model

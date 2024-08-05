@@ -251,8 +251,8 @@ subroutine read_param(paramfile)
   read(30,*) !
   read(30,*) ! Wall-model for LES ['N':none; 'ALG':algebraic; 'ODE':ordinary differential equation; ...]
   read(30,*) wm_model_type
-  if (wm_model_type.ne."N") is_wall_model=.true.
-  if (is_wall_model) call mpistop('Wall-model not implemented yet',0)
+  !if (wm_model_type.ne."N") is_wall_model=.true.
+  !if (is_wall_model) call mpistop('Wall-model not implemented yet',0)
   read(30,*) !-----------------------------------------------------------------------------------------------
   read(30,*) ! Fluid thermo-physical properties
   read(30,*) !-----------------------------------------------------------------------------------------------

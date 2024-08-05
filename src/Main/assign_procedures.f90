@@ -1080,6 +1080,9 @@ subroutine assign_procedures
      else if (wm_model_type.eq."ALG") then
        bc_wm_jmin => bc_wm_alg_jmin
        bc_wm_jmax => bc_wm_alg_jmax
+     else if (wm_model_type.eq."ALG_WALE") then 
+        bc_wm_jmin => bc_wm_wale_jmin
+        bc_wm_jmax => bc_wm_wale_jmax 
      else
        call mpistop('Wrong choice for wm_model_type...',0)
      endif
