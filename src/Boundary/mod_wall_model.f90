@@ -95,7 +95,7 @@ contains
     if (wm_model_type.eq."ODE") then
        if (iproc.eq.0) print *,"   wm_model_type: ODE"
 
-       if ((is_bc_wall(2,1)).or.(is_bc_wall(2,2))) then
+       if (((is_bc_wall(2,1)).and. .not. is_slip(2,1)).or.( (is_bc_wall(2,2)).and. .not. is_slip(2,2))) then
           ! Create phantom grid for wall model
           ! ----------------------------------
           hwm = (yg(1+wm_ind) - yg(1))
