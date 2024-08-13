@@ -71,8 +71,8 @@ contains
     enddo
     
     if (is_wall_model) then
-       if (is_bc_wall(2,1)) call bc_wm_jmin
-       if (is_bc_wall(2,2)) call bc_wm_jmax
+       if (is_bc_wall(2,1) .and. .not. is_slip(2,1)) call bc_wm_jmin
+       if (is_bc_wall(2,2) .and. .not. is_slip(2,2)) call bc_wm_jmax
     endif
     
     ! Compute derivatives of viscous fluxes along x

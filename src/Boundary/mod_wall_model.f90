@@ -63,7 +63,7 @@ contains
     wm_ind = 6
 
     ! Initialization of utau_jmin & utau_jmax <~ Only for chan for the moment
-    if (is_bc_wall(2,1)) then
+    if (is_bc_wall(2,1) .and. .not. is_slip(2,1)) then
        allocate(utau_jmin(1:nx,1:nz))
        utau_jmin(:,:) = utau
 
@@ -75,7 +75,7 @@ contains
           dir_jmin = -1.0_wp
        endif
      endif
-    if (is_bc_wall(2,2)) then
+    if (is_bc_wall(2,2) .and. .not. is_slip(2,2)) then
        allocate(utau_jmax(1:nx,1:nz))
        utau_jmax(:,:) = utau
 
@@ -135,7 +135,7 @@ contains
           enddo
        endif
 
-       if (is_bc_wall(2,1)) then
+       if (is_bc_wall(2,1) .and. .not. is_slip(2,1)) then
           ! Allocate arrays for storing values
           ! ----------------------------------
           allocate(uwm_low(0:nwm+1,1:nx,1:nz) &
@@ -171,7 +171,7 @@ contains
           enddo
        endif
 
-       if (is_bc_wall(2,2)) then
+       if (is_bc_wall(2,2) .and. .not. is_slip(2,2)) then
           ! Allocate arrays for storing values
           ! ----------------------------------
           allocate(twm_upp(0:nwm+1,1:nx,1:nz) &
