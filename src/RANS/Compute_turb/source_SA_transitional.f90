@@ -8,7 +8,6 @@ subroutine source_SA_transition
   use mod_mpi
   use mod_wall_dist
   use mod_turb_model_length_scale
-  use mod_interface
   implicit none
   ! ---------------------------------------------------------------------------
   integer  :: i,j,k
@@ -177,7 +176,7 @@ subroutine source_SA_transition
             
             
             ! Take into consideration transition mechanisms:
-            F_reattach          = exp( - (re_turb/20.0_wp)**4 )
+            F_reattach          = exp( - (re_turb/20)**4 )
             intermittency_sep   = min( 2.0_wp*max( 0.0_wp, (re_nu/(3.235_wp*re_theta_crit) - 1.0_wp))*F_reattach, 2.0_wp)*F_theta
             
             intermittency_eff(i,j,k)   = max(intermittency(i,j,k), intermittency_sep)
