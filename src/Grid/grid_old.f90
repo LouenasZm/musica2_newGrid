@@ -1151,6 +1151,10 @@ subroutine grid_chan
      write(*,*) 'dyc+:', (yg(hym+1)-yg(hym))*lplusm1
   endif
 
+  x = xg
+  y = yg
+  z = zg
+
   xmin = xg(1); xmax = xg(ngx)
   ymin = yg(1); ymax = yg(ngy)
   zmin = zg(1); zmax = zg(ngz)

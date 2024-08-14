@@ -72,66 +72,68 @@ subroutine grid_comm
 
      !call mpistop('rrr',0)
 
-     ! BC imin
-     if (bl(nbl)%BC(1)>0) then
-        if ((Lxp.ne.0.0_wp).and.(abs(xgc(0,1)-xgc(1,1)).gt.0.9_wp*Lxp)) then
-           print *,iproc,nob(iproc),(xgc(0,1)-xgc(1,1)),'pb imin'
-           if ((xgc(0,1)-xgc(1,1)).gt.0.0_wp) then
-              xgc(1-ngh:0,:)=xgc(1-ngh:0,:)-Lxp
-           else
-              xgc(1-ngh:0,:)=xgc(1-ngh:0,:)+Lxp
+    if(is_curv)then 
+        ! BC imin
+        if (bl(nbl)%BC(1)>0) then
+           if ((Lxp.ne.0.0_wp).and.(abs(xgc(0,1)-xgc(1,1)).gt.0.9_wp*Lxp)) then
+              print *,iproc,nob(iproc),(xgc(0,1)-xgc(1,1)),'pb imin'
+              if ((xgc(0,1)-xgc(1,1)).gt.0.0_wp) then
+                 xgc(1-ngh:0,:)=xgc(1-ngh:0,:)-Lxp
+              else
+                 xgc(1-ngh:0,:)=xgc(1-ngh:0,:)+Lxp
+              endif
+           endif
+           if ((Lyp.ne.0.0_wp).and.(abs(ygc(0,1)-ygc(1,1)).gt.0.9_wp*Lyp)) then
+              print *,iproc,nob(iproc),(ygc(0,1)-ygc(1,1)),'pb imin'
+              if ((ygc(0,1)-ygc(1,1)).gt.0.0_wp) then
+                 ygc(1-ngh:0,:)=ygc(1-ngh:0,:)-Lyp
+              else
+                 ygc(1-ngh:0,:)=ygc(1-ngh:0,:)+Lyp
+              endif
            endif
         endif
-        if ((Lyp.ne.0.0_wp).and.(abs(ygc(0,1)-ygc(1,1)).gt.0.9_wp*Lyp)) then
-           print *,iproc,nob(iproc),(ygc(0,1)-ygc(1,1)),'pb imin'
-           if ((ygc(0,1)-ygc(1,1)).gt.0.0_wp) then
-              ygc(1-ngh:0,:)=ygc(1-ngh:0,:)-Lyp
-           else
-              ygc(1-ngh:0,:)=ygc(1-ngh:0,:)+Lyp
+        ! BC imax
+        if (bl(nbl)%BC(2)>0) then
+           if ((Lxp.ne.0.0_wp).and.(abs(xgc(ngx+1,1)-xgc(ngx,1)).gt.0.9_wp*Lxp)) then
+              print *,iproc,nob(iproc),(xgc(ngx+1,1)-xgc(ngx,1)),'pb imax'
+              if ((xgc(ngx+1,1)-xgc(ngx,1)).gt.0.0_wp) then
+                 xgc(ngx+1:ngx+ngh,:)=xgc(ngx+1:ngx+ngh,:)-Lxp
+              else
+                 xgc(ngx+1:ngx+ngh,:)=xgc(ngx+1:ngx+ngh,:)+Lxp
+              endif
+           endif
+           if ((Lyp.ne.0.0_wp).and.(abs(ygc(ngx+1,1)-ygc(ngx,1)).gt.0.9_wp*Lyp)) then
+              print *,iproc,nob(iproc),(ygc(ngx+1,1)-ygc(ngx,1)),'pb imax'
+              if ((ygc(ngx+1,1)-ygc(ngx,1)).gt.0.0_wp) then
+                 ygc(ngx+1:ngx+ngh,:)=ygc(ngx+1:ngx+ngh,:)-Lyp
+              else
+                 ygc(ngx+1:ngx+ngh,:)=ygc(ngx+1:ngx+ngh,:)+Lyp
+              endif
            endif
         endif
-     endif
-     ! BC imax
-     if (bl(nbl)%BC(2)>0) then
-        if ((Lxp.ne.0.0_wp).and.(abs(xgc(ngx+1,1)-xgc(ngx,1)).gt.0.9_wp*Lxp)) then
-           print *,iproc,nob(iproc),(xgc(ngx+1,1)-xgc(ngx,1)),'pb imax'
-           if ((xgc(ngx+1,1)-xgc(ngx,1)).gt.0.0_wp) then
-              xgc(ngx+1:ngx+ngh,:)=xgc(ngx+1:ngx+ngh,:)-Lxp
-           else
-              xgc(ngx+1:ngx+ngh,:)=xgc(ngx+1:ngx+ngh,:)+Lxp
+        ! BC jmin
+        if (bl(nbl)%BC(3)>0) then
+           if ((Lyp.ne.0.0_wp).and.(abs(ygc(1,0)-ygc(1,1)).gt.0.9_wp*Lyp)) then
+              print *,iproc,nob(iproc),(ygc(1,0)-ygc(1,1)),'pb jmin'
+              if ((ygc(1,0)-ygc(1,1)).gt.0.0_wp) then
+                 ygc(:,1-ngh:0)=ygc(:,1-ngh:0)-Lyp
+              else
+                 ygc(:,1-ngh:0)=ygc(:,1-ngh:0)+Lyp
+              endif
            endif
         endif
-        if ((Lyp.ne.0.0_wp).and.(abs(ygc(ngx+1,1)-ygc(ngx,1)).gt.0.9_wp*Lyp)) then
-           print *,iproc,nob(iproc),(ygc(ngx+1,1)-ygc(ngx,1)),'pb imax'
-           if ((ygc(ngx+1,1)-ygc(ngx,1)).gt.0.0_wp) then
-              ygc(ngx+1:ngx+ngh,:)=ygc(ngx+1:ngx+ngh,:)-Lyp
-           else
-              ygc(ngx+1:ngx+ngh,:)=ygc(ngx+1:ngx+ngh,:)+Lyp
+        ! BC jmax
+        if (bl(nbl)%BC(4)>0) then
+           if ((Lyp.ne.0.0_wp).and.(abs(ygc(1,ngy+1)-ygc(1,ngy)).gt.0.9_wp*Lyp)) then
+              print *,iproc,nob(iproc),(ygc(1,ngy+1)-ygc(1,ngy)),'pb jmax'
+              if ((ygc(1,ngy+1)-ygc(1,ngy)).gt.0.0_wp) then
+                 ygc(:,ngy+1:ngy+ngh)=ygc(:,ngy+1:ngy+ngh)-Lyp
+              else
+                 ygc(:,ngy+1:ngy+ngh)=ygc(:,ngy+1:ngy+ngh)+Lyp
+              endif
            endif
         endif
-     endif
-     ! BC jmin
-     if (bl(nbl)%BC(3)>0) then
-        if ((Lyp.ne.0.0_wp).and.(abs(ygc(1,0)-ygc(1,1)).gt.0.9_wp*Lyp)) then
-           print *,iproc,nob(iproc),(ygc(1,0)-ygc(1,1)),'pb jmin'
-           if ((ygc(1,0)-ygc(1,1)).gt.0.0_wp) then
-              ygc(:,1-ngh:0)=ygc(:,1-ngh:0)-Lyp
-           else
-              ygc(:,1-ngh:0)=ygc(:,1-ngh:0)+Lyp
-           endif
-        endif
-     endif
-     ! BC jmax
-     if (bl(nbl)%BC(4)>0) then
-        if ((Lyp.ne.0.0_wp).and.(abs(ygc(1,ngy+1)-ygc(1,ngy)).gt.0.9_wp*Lyp)) then
-           print *,iproc,nob(iproc),(ygc(1,ngy+1)-ygc(1,ngy)),'pb jmax'
-           if ((ygc(1,ngy+1)-ygc(1,ngy)).gt.0.0_wp) then
-              ygc(:,ngy+1:ngy+ngh)=ygc(:,ngy+1:ngy+ngh)-Lyp
-           else
-              ygc(:,ngy+1:ngy+ngh)=ygc(:,ngy+1:ngy+ngh)+Lyp
-           endif
-        endif
-     endif
+    endif
 
      if (.not.is_curv3) then
      !if (iproc==4) then

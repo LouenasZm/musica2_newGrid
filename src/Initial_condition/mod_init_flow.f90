@@ -1324,10 +1324,10 @@ contains
           do j=1,ny
              do i=1,nx
 
-                if (yc(i,j).lt.0.0_wp) then
-                   uu(i,j,k)= 8.0_wp/7.0_wp*u_ref*(1.0_wp+yc(i,j)/L_ref)**(1.0_wp/7.0_wp)
+                if (y(i).lt.0.0_wp) then
+                   uu(i,j,k)= 8.0_wp/7.0_wp*u_ref*(1.0_wp+y(i)/L_ref)**(1.0_wp/7.0_wp)
                 else
-                   uu(i,j,k)= 8.0_wp/7.0_wp*u_ref*(1.0_wp-yc(i,j)/L_ref)**(1.0_wp/7.0_wp)
+                   uu(i,j,k)= 8.0_wp/7.0_wp*u_ref*(1.0_wp-y(i)/L_ref)**(1.0_wp/7.0_wp)
                 endif
 
                 call random_number(eps)

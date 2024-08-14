@@ -101,8 +101,8 @@ subroutine setupref
          ! Att: for incompressible channel flow, the Mach
          ! number is based on centerline velocity
          ! values of Reynolds centerline
-         Rec=3300.0_wp ! Re180
-         ! Rec=7178.0_wp ! Re360
+         !Rec=3300.0_wp ! Re180
+          Rec=7178.0_wp ! Re360
          ! Rec=15494.4_wp ! Re720
          ! correct u_ref
          u_ref=u_ref*Re_ref/Rec
@@ -120,8 +120,8 @@ subroutine setupref
          ! for incompressible channel flow the Mach number
          ! is based on centerline velocity
          ! values of Reynolds centerline
-         Re_tau=180.0_wp
-         ! Re_tau=360.0_wp
+        !  Re_tau=180.0_wp
+         Re_tau=360.0_wp
          ! Re_tau=720.0_wp
          ! used to have a first guess of u_tau
          utau = Re_tau*mu_ref/(rho_wall*L_ref)
@@ -131,7 +131,7 @@ subroutine setupref
          ! for incompressible channel flow the Mach number
          ! is based on centerline velocity
          ! values of Reynolds centerline
-         Re_tau=180.0_wp
+         Re_tau=360.0_wp
          ! used to have a first guess of u_tau
          utau = Re_tau*mu_ref/(rho_wall*L_ref)
          ! non-dimensional time scale
@@ -159,9 +159,9 @@ subroutine setupref
       !longx=1.0_wp
       !longx=2.0_wp
       ! Wall scaled deltay: dy0
-      dy0p=0.8_wp ! Re180
-      ! dy0p=0.95_wp ! Re360
-      dy0p=deltay ! Wall-model
+    !   dy0p=0.8_wp ! Re180
+    !   dy0p=0.95_wp ! Re360
+      dy0p=15.0_wp ! Wall-model
       ! dy0p=0.49_wp ! MFU
       !dy0p=1.8_wp
       !dy0p=3.0_wp
