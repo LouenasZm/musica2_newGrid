@@ -63,7 +63,7 @@ subroutine assign_procedures
   use mod_wall_model
   implicit none
   ! ------------------------------------------------------------------------------
-  external :: flux_visc_5pts_SM &
+  external :: flux_visc_5pts_SM, flux_visc_5pts_SM_wall &
        , grad_scalar_3pts_c, grad_scalar_3pts_c3 &
        , grad_scalar_5pts_c, grad_scalar_5pts_c3 &
        , stats_tgv, stats_chit, stats_chan, stats_stbl, stats_cyl, stats_sphere, stats_shit, stats_act, stats_turb, stats_turb3 &
@@ -374,6 +374,8 @@ subroutine assign_procedures
            if (is_sgs_model) then
               if (model_LES.eq."SM") then
                  flux_visc => flux_visc_5pts_SM
+              elseif(model_LES.eq."SM_wall")then 
+                flux_visc => flux_visc_5pts_SM_wall
               else
                   call mpistop('No LES model other than "SM" implemented for 5pts stencil', 0)
               endif
