@@ -60,7 +60,7 @@ contains
     if (iproc.eq.0) print *,"======================================================================"
 
     ! Specified here for the moment
-    wm_ind = 6
+    wm_ind = 4
 
     ! Initialization of utau_jmin & utau_jmax <~ Only for chan for the moment
     if (is_bc_wall(2,1)) then
