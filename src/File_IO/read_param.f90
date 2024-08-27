@@ -251,7 +251,7 @@ subroutine read_param(paramfile)
   read(30,*) !
   read(30,*) ! Wall-model for LES ['N':none; 'ALG':algebraic; 'ODE':ordinary differential equation; ...]
   read(30,*) wm_model_type
-  !if (wm_model_type.ne."N") is_wall_model=.true.
+  if (wm_model_type.ne."N") is_wall_model=.true.
   !if (is_wall_model) call mpistop('Wall-model not implemented yet',0)
   read(30,*) !-----------------------------------------------------------------------------------------------
   read(30,*) ! Fluid thermo-physical properties
@@ -522,7 +522,7 @@ subroutine read_param(paramfile)
   ! is_dissip_in_increments=.true.
 
   ! Old way of defining grid: to be let .false. by default !
-  is_grid_old=.true.
+  is_grid_old=.false.
 
   if (is_residue) then
      open(31,file='residuals.bin',form='unformatted',status='unknown')

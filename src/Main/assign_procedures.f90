@@ -373,9 +373,7 @@ subroutine assign_procedures
            grad_T    => grad_T_5pts
            if (is_sgs_model) then
               if (model_LES.eq."SM") then
-                 flux_visc => flux_visc_5pts_SM
-              elseif(model_LES.eq."SM_wall")then 
-                flux_visc => flux_visc_5pts_SM_wall
+                flux_visc => flux_visc_5pts_SM
               else
                   call mpistop('No LES model other than "SM" implemented for 5pts stencil', 0)
               endif
