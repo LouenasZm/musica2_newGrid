@@ -90,7 +90,7 @@ subroutine flux_visc_5pts_SM
   ! ===========================
   Aplus = 26.0_wp
   VD = 1.0_wp; VD2 = 1.0_wp
-  if (is_bc_wall(2,1)) then
+  if (is_bc_wall(2,1) .and. .not. is_slip(2,1)) then
      utau_mean = SUM(utau_jmin(1:nx,1:nz))/(nz*nx)
      rho_mean = SUM(rho(1:nx,1,1:nz))/(nz*nx)
      visc_mean = SUM(visc(1:nx,1,1:nz))/(nz*nx)
@@ -98,7 +98,7 @@ subroutine flux_visc_5pts_SM
        VD(j) = 1.0_wp - exp(-(abs(y(j)-y(1))*utau_mean*rho_mean/visc_mean)/Aplus)
      enddo
   endif
-  if (is_bc_wall(2,2)) then
+  if (is_bc_wall(2,2 .and. .not. is_slip(2,2))) then
      utau_mean = SUM(utau_jmax(1:nx,1:nz))/(nz*nx)
      rho_mean = SUM(rho(1:nx,ny,1:nz))/(nz*nx)
      visc_mean = SUM(visc(1:nx,ny,1:nz))/(nz*nx)
@@ -107,7 +107,7 @@ subroutine flux_visc_5pts_SM
      enddo
   endif
 
-  if ((is_bc_wall(2,1)).or.(is_bc_wall(2,2))) then
+  if ( ( (is_bc_wall(2,1)) .and. .not. is_slip(2,1)).or. ((is_bc_wall(2,2)).and. .not. is_slip(2,2) )) then
      VD = VD*VD2
      do k=ndzt_v,nfzt_v
         do j=ndyt_v,nfyt_v
@@ -212,8 +212,8 @@ subroutine flux_visc_5pts_SM
   ! Wall modeling
   ! =============
   if (is_wall_model) then
-     if (is_bc_wall(2,1)) call bc_wm_jmin
-     if (is_bc_wall(2,2)) call bc_wm_jmax
+     if (is_bc_wall(2,1) .and. .not. is_slip(2,1)) call bc_wm_jmin
+     if (is_bc_wall(2,2) .and. .not. is_slip(2,2)) call bc_wm_jmax
   endif
 
 
