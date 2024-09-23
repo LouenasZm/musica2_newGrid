@@ -513,7 +513,7 @@ subroutine read_param(paramfile)
 
   ! for what ????????????? TO BE CHANGED
   dtprint = 10000.0_wp
-
+  
   ! Use of one-sided or two sided communications
   ! **** BOOLEAN NOT USED yet ****
   is_two_sided_comm = .false.; is_comm_onesided = .false.
@@ -522,7 +522,7 @@ subroutine read_param(paramfile)
   ! is_dissip_in_increments=.true.
 
   ! Old way of defining grid: to be let .false. by default !
-  is_grid_old=.false.
+  is_grid_old=.true.
 
   if (is_residue) then
      open(31,file='residuals.bin',form='unformatted',status='unknown')

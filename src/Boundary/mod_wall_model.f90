@@ -928,8 +928,9 @@ subroutine tdma( n, a, b, c, d, x )
 end subroutine tdma
 
 !=================================================================================================================================================================
-!                                             Algebraic wall model supplemented with the Wall-Adaptive Local Eddy-Viscosity (WALE)
-!=================================================================================================================================================================
+!                                             Algebraic wall model supplemented with the Smagorinsky model at wall
+!================================================================================================================================================================
+
  !==============================================================================
 subroutine bc_wm_wale_jmin
     !==============================================================================
@@ -944,6 +945,8 @@ subroutine bc_wm_wale_jmin
       real(wp) :: S11_w, S22_w, S33_w, S12_w, S13_w, S23_w
       real(wp), parameter :: coeff = sqrt(10.6_wp)
       ! ---------------------------------------------------------------------------
+      external :: filter_sij 
+      
     deltac = (idx(1)*idy(1)*idz(1))**(-1./3.)
     
       j0 = 1; j1 = j0+wm_ind
@@ -989,12 +992,13 @@ subroutine bc_wm_wale_jmin
     do k=1,nz 
         do i=1,nx 
             ! Compute S_ij at wall: 
-            S11_w   = dux(i,j0,k)
-            S22_w   = dvy(i,j0,k)
-            S33_w   = dwz(i,j0,k)
-            S12_w   = 0.5_wp*(duy(i,j0,k)+dvx(i,j0,k))
-            S13_w   = 0.5_wp*(duz(i,j0,k)+dwx(i,j0,k))
-            S23_w   = 0.5_wp*(dvz(i,j0,k)+dwy(i,j0,k))
+            call filtre_Sij
+            S11_w   = S11f(i,j0,k)
+            S22_w   = S22f(i,j0,k)
+            S33_w   = S33f(i,j0,k)
+            S12_w   = S12f(i,j0,k)
+            S13_w   = S13f(i,j0,k)
+            S23_w   = S23f(i,j0,k)
             ! Get nu_sgs: 
             visco_sgs       = rho(i,j0,k)*((Cs_SM*deltac)**2)*sqrt(2.*(S11_w**2+S22_w**2+S33_w**2 &
                                               + 2.*(S12_w**2 +S13_w**2+S23_w**2)))
@@ -1017,6 +1021,7 @@ subroutine bc_wm_wale_jmin
       real(wp) :: visc_sgs, sum_gij, visco_sgs, deltac
       real(wp) :: S11_w, S22_w, S33_w, S12_w, S13_w, S23_w
       real(wp), parameter :: coeff = sqrt(10.6_wp)
+      external :: filtre_Sij
       ! ! Test stochastic forcing
       ! real(wp) :: tau11,tau22,tau33,tau12,tau13,tau23,trace,mu
       ! real(wp) :: coeff_kappa,var,yp_
@@ -1071,12 +1076,13 @@ subroutine bc_wm_wale_jmin
     do k=1,nz 
         do i=1,nx 
             ! Compute S_ij at wall: 
-            S11_w   = dux(i,j0,k)
-            S22_w   = dvy(i,j0,k)
-            S33_w   = dwz(i,j0,k)
-            S12_w   = 0.5_wp*(duy(i,j0,k)+dvx(i,j0,k))
-            S13_w   = 0.5_wp*(duz(i,j0,k)+dwx(i,j0,k))
-            S23_w   = 0.5_wp*(dvz(i,j0,k)+dwy(i,j0,k))
+            call filtre_Sij
+            S11_w   = S11f(i,j0,k)
+            S22_w   = S22f(i,j0,k)
+            S33_w   = S33f(i,j0,k)
+            S12_w   = S12f(i,j0,k)
+            S13_w   = S13f(i,j0,k)
+            S23_w   = S23f(i,j0,k)
             ! Get nu_sgs: 
             visco_sgs   = rho(i,j0,k)*((Cs_SM*deltac)**2)*sqrt(2.*(S11_w**2+S22_w**2+S33_w**2 &
                                               + 2.*(S12_w**2 +S13_w**2+S23_w**2)))
