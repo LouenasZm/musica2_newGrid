@@ -992,13 +992,12 @@ subroutine bc_wm_wale_jmin
     do k=1,nz 
         do i=1,nx 
             ! Compute S_ij at wall: 
-            call filtre_Sij
-            S11_w   = S11f(i,j0,k)
-            S22_w   = S22f(i,j0,k)
-            S33_w   = S33f(i,j0,k)
-            S12_w   = S12f(i,j0,k)
-            S13_w   = S13f(i,j0,k)
-            S23_w   = S23f(i,j0,k)
+            S11_w   = dux(i,j0,k)
+            S22_w   = dvy(i,j0,k)
+            S33_w   = dwz(i,j0,k)
+            S12_w   = 0.5_wp*(duy(i,j0,k)+dvx(i,j0,k))
+            S13_w   = 0.5_wp*(duz(i,j0,k)+dwx(i,j0,k))
+            S23_w   = 0.5_wp*(dvz(i,j0,k)+dwy(i,j0,k))
             ! Get nu_sgs: 
             visco_sgs       = rho(i,j0,k)*((Cs_SM*deltac)**2)*sqrt(2.*(S11_w**2+S22_w**2+S33_w**2 &
                                               + 2.*(S12_w**2 +S13_w**2+S23_w**2)))
@@ -1076,13 +1075,12 @@ subroutine bc_wm_wale_jmin
     do k=1,nz 
         do i=1,nx 
             ! Compute S_ij at wall: 
-            call filtre_Sij
-            S11_w   = S11f(i,j0,k)
-            S22_w   = S22f(i,j0,k)
-            S33_w   = S33f(i,j0,k)
-            S12_w   = S12f(i,j0,k)
-            S13_w   = S13f(i,j0,k)
-            S23_w   = S23f(i,j0,k)
+            S11_w   = dux(i,j0,k)
+            S22_w   = dvy(i,j0,k)
+            S33_w   = dwz(i,j0,k)
+            S12_w   = 0.5_wp*(duy(i,j0,k)+dvx(i,j0,k))
+            S13_w   = 0.5_wp*(duz(i,j0,k)+dwx(i,j0,k))
+            S23_w   = 0.5_wp*(dvz(i,j0,k)+dwy(i,j0,k))
             ! Get nu_sgs: 
             visco_sgs   = rho(i,j0,k)*((Cs_SM*deltac)**2)*sqrt(2.*(S11_w**2+S22_w**2+S33_w**2 &
                                               + 2.*(S12_w**2 +S13_w**2+S23_w**2)))
